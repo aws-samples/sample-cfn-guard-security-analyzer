@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Capture Deployed AWS Resources",
+  "description": "After a shell command completes, check if it was a CDK deploy or AWS CLI command that created resources. If so, extract the deployed resource ARNs, names, and endpoints from the output and update .kiro/steering/resources.md with the real values.",
+  "version": "1",
+  "when": {
+    "type": "postToolUse",
+    "toolTypes": [
+      "shell"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A shell command just finished. Check if it was a `cdk deploy`, `aws cloudformation`, or similar command that provisions AWS resources. If it was, inspect the command output for CloudFormation stack outputs, resource ARNs, endpoint URLs, bucket names, table names, cluster names, or any other deployed resource identifiers. Then update `.kiro/steering/resources.md` by adding or updating entries under the appropriate section with the real deployed values (ARNs, names, URLs, endpoints). Preserve the front matter and existing structure. If the command was not related to AWS resource provisioning, do nothing."
+  }
+}

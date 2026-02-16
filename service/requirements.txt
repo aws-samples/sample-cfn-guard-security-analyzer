@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+boto3
+reportlab
+websockets
+httpx
+hypothesis
+pytest
+pytest-asyncio
+moto

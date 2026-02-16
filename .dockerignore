@@ -1,0 +1,7 @@
+.git
+.venv
+cdk.out
+tests
+__pycache__
+*.pyc
+.kiro
