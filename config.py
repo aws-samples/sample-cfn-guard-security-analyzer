@@ -57,7 +57,7 @@ class EnvironmentConfig:
 ENVIRONMENTS = {
     "dev": EnvironmentConfig(
         environment_name="dev",
-        account="YOUR_AWS_ACCOUNT_ID",  # Replace with your AWS account ID
+        account="111111111111",  # Replace with your AWS account ID
         region="us-east-1",
         lambda_log_retention_days=7,  # Changed from 3 to 7 (valid enum value)
         create_alarms=False,
@@ -65,7 +65,7 @@ ENVIRONMENTS = {
     ),
     "staging": EnvironmentConfig(
         environment_name="staging",
-        account="YOUR_AWS_ACCOUNT_ID",  # Replace with your AWS account ID
+        account="111111111111",  # Replace with your AWS account ID
         region="us-east-1",
         lambda_log_retention_days=7,
         create_alarms=True,
@@ -73,7 +73,7 @@ ENVIRONMENTS = {
     ),
     "prod": EnvironmentConfig(
         environment_name="prod",
-        account="YOUR_AWS_ACCOUNT_ID",  # Replace with your AWS account ID
+        account="111111111111",  # Replace with your AWS account ID
         region="us-east-1",
         lambda_memory_mb=1024,
         lambda_log_retention_days=30,

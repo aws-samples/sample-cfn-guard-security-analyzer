@@ -138,3 +138,54 @@
     0%, 100% { background-color: #ffffff; }
     50% { background-color: #f0f7ff; }
 }
+
+/* Analysis Type Selector */
+.analysis-type-selector {
+    display: flex;
+    gap: 1rem;
+}
+
+.analysis-type-option {
+    flex: 1;
+    cursor: pointer;
+}
+
+.analysis-type-option input[type="radio"] {
+    display: none;
+}
+
+.analysis-type-card {
+    border: 2px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+    transition: all 0.2s ease;
+    background-color: #ffffff;
+}
+
+.analysis-type-card:hover {
+    border-color: #93c5fd;
+    background-color: #f0f7ff;
+}
+
+.analysis-type-option input[type="radio"]:checked + .analysis-type-card {
+    border-color: #3b82f6;
+    background-color: #eff6ff;
+    box-shadow: 0 0 0 1px #3b82f6;
+}
+
+.analysis-type-title {
+    font-weight: 600;
+    color: #1f2937;
+    font-size: 0.95rem;
+    margin-bottom: 0.25rem;
+}
+
+.analysis-type-title i {
+    margin-right: 0.25rem;
+    color: #3b82f6;
+}
+
+.analysis-type-desc {
+    font-size: 0.8rem;
+    color: #6b7280;
+}

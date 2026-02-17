@@ -4,20 +4,20 @@ agents:
     name: cfn_security_analyzer
     language: python
     node_version: '20'
-    entrypoint: ./agents/security_analyzer_agent.py
+    entrypoint: /Users/gangprab/Documents/Kiro/security-analyzer-for-cfn-resource/security-analyzer-for-cfn-resource-main/serverless-infrastructure/agents/security_analyzer_agent.py
     deployment_type: direct_code_deploy
     runtime_type: PYTHON_3_11
     platform: linux/arm64
     container_runtime: null
-    source_path: ./agents
+    source_path: /Users/gangprab/Documents/Kiro/security-analyzer-for-cfn-resource/security-analyzer-for-cfn-resource-main/serverless-infrastructure/agents
     aws:
-      execution_role: arn:aws:iam::YOUR_AWS_ACCOUNT_ID:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-YOUR_ROLE_ID
+      execution_role: arn:aws:iam::111111111111:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-f2a2ad8d34
       execution_role_auto_create: false
-      account: 'YOUR_AWS_ACCOUNT_ID'
+      account: '111111111111'
       region: us-east-1
       ecr_repository: null
       ecr_auto_create: false
-      s3_path: s3://bedrock-agentcore-codebuild-sources-YOUR_AWS_ACCOUNT_ID-us-east-1
+      s3_path: s3://bedrock-agentcore-codebuild-sources-111111111111-us-east-1
       s3_auto_create: false
       network_configuration:
         network_mode: PUBLIC
@@ -30,8 +30,8 @@ agents:
         idle_runtime_session_timeout: null
         max_lifetime: null
     bedrock_agentcore:
-      agent_id: cfn_security_analyzer-YOUR_AGENT_ID
-      agent_arn: arn:aws:bedrock-agentcore:us-east-1:YOUR_AWS_ACCOUNT_ID:runtime/cfn_security_analyzer-YOUR_AGENT_ID
+      agent_id: cfn_security_analyzer-mRHhTSCZIG
+      agent_arn: arn:aws:bedrock-agentcore:us-east-1:111111111111:runtime/cfn_security_analyzer-mRHhTSCZIG
       agent_session_id: null
     codebuild:
       project_name: null
@@ -39,8 +39,8 @@ agents:
       source_bucket: null
     memory:
       mode: STM_ONLY
-      memory_id: cfn_security_analyzer_mem-YOUR_MEM_ID
-      memory_arn: arn:aws:bedrock-agentcore:us-east-1:YOUR_AWS_ACCOUNT_ID:memory/cfn_security_analyzer_mem-YOUR_MEM_ID
+      memory_id: cfn_security_analyzer_mem-H4EK6G3xBs
+      memory_arn: arn:aws:bedrock-agentcore:us-east-1:111111111111:memory/cfn_security_analyzer_mem-H4EK6G3xBs
       memory_name: cfn_security_analyzer_mem
       event_expiry_days: 30
       first_invoke_memory_check_done: true
@@ -64,20 +64,20 @@ agents:
     name: cfn_crawler
     language: python
     node_version: '20'
-    entrypoint: ./agents/crawler_agent.py
+    entrypoint: /Users/gangprab/Documents/Kiro/security-analyzer-for-cfn-resource/security-analyzer-for-cfn-resource-main/serverless-infrastructure/agents/crawler_agent.py
     deployment_type: direct_code_deploy
     runtime_type: PYTHON_3_11
     platform: linux/arm64
     container_runtime: null
-    source_path: ./agents
+    source_path: /Users/gangprab/Documents/Kiro/security-analyzer-for-cfn-resource/security-analyzer-for-cfn-resource-main/serverless-infrastructure/agents
     aws:
-      execution_role: arn:aws:iam::YOUR_AWS_ACCOUNT_ID:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-YOUR_ROLE_ID
+      execution_role: arn:aws:iam::111111111111:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-7502069c19
       execution_role_auto_create: false
-      account: 'YOUR_AWS_ACCOUNT_ID'
+      account: '111111111111'
       region: us-east-1
       ecr_repository: null
       ecr_auto_create: false
-      s3_path: s3://bedrock-agentcore-codebuild-sources-YOUR_AWS_ACCOUNT_ID-us-east-1
+      s3_path: s3://bedrock-agentcore-codebuild-sources-111111111111-us-east-1
       s3_auto_create: false
       network_configuration:
         network_mode: PUBLIC
@@ -90,8 +90,8 @@ agents:
         idle_runtime_session_timeout: null
         max_lifetime: null
     bedrock_agentcore:
-      agent_id: cfn_crawler-YOUR_AGENT_ID
-      agent_arn: arn:aws:bedrock-agentcore:us-east-1:YOUR_AWS_ACCOUNT_ID:runtime/cfn_crawler-YOUR_AGENT_ID
+      agent_id: cfn_crawler-30OD06FRns
+      agent_arn: arn:aws:bedrock-agentcore:us-east-1:111111111111:runtime/cfn_crawler-30OD06FRns
       agent_session_id: null
     codebuild:
       project_name: null
@@ -100,7 +100,7 @@ agents:
     memory:
       mode: STM_ONLY
       memory_id: cfn_crawler_mem-iimnmUAAic
-      memory_arn: arn:aws:bedrock-agentcore:us-east-1:YOUR_AWS_ACCOUNT_ID:memory/cfn_crawler_mem-iimnmUAAic
+      memory_arn: arn:aws:bedrock-agentcore:us-east-1:111111111111:memory/cfn_crawler_mem-iimnmUAAic
       memory_name: cfn_crawler_mem
       event_expiry_days: 30
       first_invoke_memory_check_done: true
@@ -124,20 +124,20 @@ agents:
     name: cfn_property_analyzer
     language: python
     node_version: '20'
-    entrypoint: ./agents/property_analyzer_agent.py
+    entrypoint: /Users/gangprab/Documents/Kiro/security-analyzer-for-cfn-resource/security-analyzer-for-cfn-resource-main/serverless-infrastructure/agents/property_analyzer_agent.py
     deployment_type: direct_code_deploy
     runtime_type: PYTHON_3_11
     platform: linux/arm64
     container_runtime: null
-    source_path: ./agents
+    source_path: /Users/gangprab/Documents/Kiro/security-analyzer-for-cfn-resource/security-analyzer-for-cfn-resource-main/serverless-infrastructure/agents
     aws:
-      execution_role: arn:aws:iam::YOUR_AWS_ACCOUNT_ID:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-01b5b209ad
+      execution_role: arn:aws:iam::111111111111:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-01b5b209ad
       execution_role_auto_create: false
-      account: 'YOUR_AWS_ACCOUNT_ID'
+      account: '111111111111'
       region: us-east-1
       ecr_repository: null
       ecr_auto_create: false
-      s3_path: s3://bedrock-agentcore-codebuild-sources-YOUR_AWS_ACCOUNT_ID-us-east-1
+      s3_path: s3://bedrock-agentcore-codebuild-sources-111111111111-us-east-1
       s3_auto_create: false
       network_configuration:
         network_mode: PUBLIC
@@ -150,8 +150,8 @@ agents:
         idle_runtime_session_timeout: null
         max_lifetime: null
     bedrock_agentcore:
-      agent_id: cfn_property_analyzer-YOUR_AGENT_ID
-      agent_arn: arn:aws:bedrock-agentcore:us-east-1:YOUR_AWS_ACCOUNT_ID:runtime/cfn_property_analyzer-YOUR_AGENT_ID
+      agent_id: cfn_property_analyzer-1r49DI2B44
+      agent_arn: arn:aws:bedrock-agentcore:us-east-1:111111111111:runtime/cfn_property_analyzer-1r49DI2B44
       agent_session_id: null
     codebuild:
       project_name: null
@@ -160,7 +160,7 @@ agents:
     memory:
       mode: STM_ONLY
       memory_id: cfn_property_analyzer_mem-qtCuOv5E5n
-      memory_arn: arn:aws:bedrock-agentcore:us-east-1:YOUR_AWS_ACCOUNT_ID:memory/cfn_property_analyzer_mem-qtCuOv5E5n
+      memory_arn: arn:aws:bedrock-agentcore:us-east-1:111111111111:memory/cfn_property_analyzer_mem-qtCuOv5E5n
       memory_name: cfn_property_analyzer_mem
       event_expiry_days: 30
       first_invoke_memory_check_done: true

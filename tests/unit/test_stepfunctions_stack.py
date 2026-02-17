@@ -153,3 +153,162 @@ def test_notifier_lambda_inline_code_posts_to_callbacks(template):
         notifier_found = True
         break
     assert notifier_found, "ProgressNotifier Lambda not found in template"
+
+
+def _get_state_machine_definition(template):
+    """Helper: extract and parse the state machine definition from the template."""
+    resources = template.to_json()["Resources"]
+    for resource in resources.values():
+        if resource.get("Type") != "AWS::StepFunctions::StateMachine":
+            continue
+        def_str = resource["Properties"]["DefinitionString"]
+        # DefinitionString is typically a Fn::Join intrinsic with CloudFormation
+        # references (Ref, Fn::GetAtt) embedded as dict parts. Replace those
+        # with placeholder strings so the result is valid JSON.
+        if isinstance(def_str, dict) and "Fn::Join" in def_str:
+            separator, parts = def_str["Fn::Join"]
+            resolved = []
+            for p in parts:
+                if isinstance(p, str):
+                    resolved.append(p)
+                elif isinstance(p, dict):
+                    # Replace intrinsic references with a safe placeholder
+                    if "Ref" in p:
+                        resolved.append(p["Ref"])
+                    elif "Fn::GetAtt" in p:
+                        resolved.append(".".join(p["Fn::GetAtt"]))
+                    else:
+                        resolved.append("PLACEHOLDER")
+                else:
+                    resolved.append(str(p))
+            flat = separator.join(resolved)
+            return json.loads(flat)
+        return json.loads(def_str)
+    raise AssertionError("State machine not found in template")
+
+
+def test_notify_property_analyzed_inside_map_iterator(template):
+    """The Map iterator should contain a NotifyPropertyAnalyzed step chained after AnalyzeSingleProperty."""
+    defn = _get_state_machine_definition(template)
+    states = defn["States"]
+
+    # Find the Map state
+    map_state = None
+    for name, state in states.items():
+        if state.get("Type") == "Map":
+            map_state = state
+            break
+    assert map_state is not None, "Map state not found in definition"
+
+    # The iterator should contain NotifyPropertyAnalyzed
+    iterator_states = map_state["Iterator"]["States"]
+    assert "NotifyPropertyAnalyzed" in iterator_states, (
+        f"NotifyPropertyAnalyzed not found in Map iterator. States: {list(iterator_states.keys())}"
+    )
+
+    # AnalyzeSingleProperty should chain to NotifyPropertyAnalyzed
+    analyze_state = iterator_states["AnalyzeSingleProperty"]
+    assert analyze_state.get("Next") == "NotifyPropertyAnalyzed", (
+        f"AnalyzeSingleProperty.Next should be NotifyPropertyAnalyzed, got {analyze_state.get('Next')}"
+    )
+
+
+def test_notify_property_analyzed_has_catch_handler(template):
+    """The NotifyPropertyAnalyzed step should have a Catch handler for States.ALL."""
+    defn = _get_state_machine_definition(template)
+    states = defn["States"]
+
+    # Find the Map state and its iterator
+    for state in states.values():
+        if state.get("Type") == "Map":
+            iterator_states = state["Iterator"]["States"]
+            break
+    else:
+        pytest.fail("Map state not found")
+
+    notify_state = iterator_states["NotifyPropertyAnalyzed"]
+    catchers = notify_state.get("Catch", [])
+    assert len(catchers) > 0, "NotifyPropertyAnalyzed should have at least one Catch handler"
+
+    # Verify it catches States.ALL
+    error_codes = [err for c in catchers for err in c.get("ErrorEquals", [])]
+    assert "States.ALL" in error_codes, (
+        f"Catch handler should include States.ALL, got {error_codes}"
+    )
+
+
+def test_notify_property_analyzed_payload_has_required_fields(template):
+    """The NotifyPropertyAnalyzed payload should contain step, detail.property, detail.result, detail.index, detail.total."""
+    defn = _get_state_machine_definition(template)
+    states = defn["States"]
+
+    # Find the Map state and its iterator
+    for state in states.values():
+        if state.get("Type") == "Map":
+            iterator_states = state["Iterator"]["States"]
+            break
+    else:
+        pytest.fail("Map state not found")
+
+    notify_state = iterator_states["NotifyPropertyAnalyzed"]
+    params = notify_state.get("Parameters", {})
+
+    # CDK LambdaInvoke wraps the user payload under a "Payload" key
+    payload = params.get("Payload", params)
+
+    # Verify required top-level fields
+    assert payload.get("step") == "property_analyzed", (
+        f"step should be 'property_analyzed', got {payload.get('step')}"
+    )
+
+    # Verify detail sub-fields exist (they use .$ suffix for JSONPath references)
+    detail = payload.get("detail", {})
+    assert "property.$" in detail, "detail should contain 'property.$'"
+    assert "result.$" in detail, "detail should contain 'result.$'"
+    assert "index.$" in detail, "detail should contain 'index.$'"
+    assert "total.$" in detail, "detail should contain 'total.$'"
+
+
+def test_compute_total_properties_state_before_map(template):
+    """A ComputeTotalProperties Pass state should exist and chain before the Map state."""
+    defn = _get_state_machine_definition(template)
+    states = defn["States"]
+
+    assert "ComputeTotalProperties" in states, (
+        f"ComputeTotalProperties not found. States: {list(states.keys())}"
+    )
+
+    compute_state = states["ComputeTotalProperties"]
+    assert compute_state["Type"] == "Pass"
+
+    # It should compute totalProperties using States.ArrayLength
+    params = compute_state.get("Parameters", {})
+    assert "totalProperties.$" in params, "ComputeTotalProperties should set totalProperties.$"
+    assert "ArrayLength" in params["totalProperties.$"], (
+        f"totalProperties should use States.ArrayLength, got {params['totalProperties.$']}"
+    )
+
+    # ComputeTotalProperties should chain to the Map state
+    next_state_name = compute_state.get("Next")
+    assert next_state_name is not None, "ComputeTotalProperties should have a Next state"
+    next_state = states.get(next_state_name)
+    assert next_state is not None and next_state.get("Type") == "Map", (
+        f"ComputeTotalProperties.Next should point to a Map state, got {next_state_name}"
+    )
+
+
+def test_map_state_passes_index_and_total_to_iterator(template):
+    """The Map state parameters should include index and totalProperties for the iterator."""
+    defn = _get_state_machine_definition(template)
+    states = defn["States"]
+
+    # Find the Map state
+    for state in states.values():
+        if state.get("Type") == "Map":
+            params = state.get("Parameters", {})
+            break
+    else:
+        pytest.fail("Map state not found")
+
+    assert "index.$" in params, "Map parameters should include 'index.$'"
+    assert "totalProperties.$" in params, "Map parameters should include 'totalProperties.$'"

@@ -34,12 +34,12 @@ class StepFunctionsStack(Stack):
         # Create agent invoker Lambda functions
         self.crawler_invoker = self._create_agent_invoker_lambda(
             "CrawlerInvoker",
-            "arn:aws:bedrock-agentcore:us-east-1:YOUR_AWS_ACCOUNT_ID:runtime/cfn_crawler-YOUR_AGENT_ID"
+            "arn:aws:bedrock-agentcore:us-east-1:111111111111:runtime/cfn_crawler-30OD06FRns"
         )
         
         self.property_analyzer_invoker = self._create_agent_invoker_lambda(
             "PropertyAnalyzerInvoker",
-            "arn:aws:bedrock-agentcore:us-east-1:YOUR_AWS_ACCOUNT_ID:runtime/cfn_property_analyzer-YOUR_AGENT_ID"
+            "arn:aws:bedrock-agentcore:us-east-1:111111111111:runtime/cfn_property_analyzer-1r49DI2B44"
         )
         
         # Create progress notifier Lambda
@@ -93,9 +93,37 @@ class StepFunctionsStack(Stack):
             handler="index.handler",
             code=lambda_.Code.from_inline(f"""
 import json
+import re
 import boto3
 
 bedrock_agentcore = boto3.client('bedrock-agentcore')
+
+
+def extract_json_from_text(text):
+    \"\"\"Extract the first JSON object from text that may contain markdown code fences.\"\"\"
+    # Try direct parse first
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        pass
+    # Extract from markdown code fences: ```json ... ``` or ``` ... ```
+    pattern = r'```(?:json)?\\s*\\n?(\\{{.*?\\}})\\s*\\n?```'
+    matches = re.findall(pattern, text, re.DOTALL)
+    for match in matches:
+        try:
+            return json.loads(match)
+        except json.JSONDecodeError:
+            continue
+    # Try to find any JSON object in the text
+    pattern2 = r'(\\{{[^{{}}]*\"properties\"\\s*:\\s*\\[.*?\\]\\s*\\}})'
+    matches2 = re.findall(pattern2, text, re.DOTALL)
+    for match in matches2:
+        try:
+            return json.loads(match)
+        except json.JSONDecodeError:
+            continue
+    return None
+
 
 def handler(event, context):
     agent_arn = event['agentArn']
@@ -121,27 +149,23 @@ def handler(event, context):
         else:
             result_text = json.dumps(response_body)
         
-        # Parse result_text if it's a string
+        # Parse result_text — handle markdown code fences from agent responses
         if isinstance(result_text, str):
-            try:
-                parsed_result = json.loads(result_text)
-            except json.JSONDecodeError:
-                # Return raw text if not JSON
+            parsed_result = extract_json_from_text(result_text)
+            if parsed_result is None:
                 return {{
                     'rawResponse': result_text,
                     'parsed': False
                 }}
         else:
-            # Already a dict
             parsed_result = result_text
         
-        # If the parsed result has a 'result' field that's a JSON string, parse it
+        # If the parsed result has a 'result' field that's a string, try to extract JSON
         if isinstance(parsed_result, dict) and 'result' in parsed_result:
             if isinstance(parsed_result['result'], str):
-                try:
-                    parsed_result['result'] = json.loads(parsed_result['result'])
-                except json.JSONDecodeError:
-                    pass  # Keep as string if not valid JSON
+                extracted = extract_json_from_text(parsed_result['result'])
+                if extracted is not None:
+                    parsed_result['result'] = extracted
         
         return parsed_result
             
@@ -241,12 +265,12 @@ def handler(event, context):
 
     def _create_state_machine(self) -> sfn.StateMachine:
         """Create Step Functions state machine for detailed analysis workflow.
-        
+
         Returns:
             Step Functions StateMachine construct
         """
         # Define workflow states
-        
+
         # 1. Update status to IN_PROGRESS
         update_status_in_progress = tasks.DynamoPutItem(
             self,
@@ -263,21 +287,21 @@ def handler(event, context):
             },
             result_path=sfn.JsonPath.DISCARD,
         )
-        
+
         # 2. Crawl documentation using AgentCore Crawler Agent
         crawl_documentation = tasks.LambdaInvoke(
             self,
             "CrawlDocumentation",
             lambda_function=self.crawler_invoker,
             payload=sfn.TaskInput.from_object({
-                "agentArn": "arn:aws:bedrock-agentcore:us-east-1:YOUR_AWS_ACCOUNT_ID:runtime/cfn_crawler-YOUR_AGENT_ID",
+                "agentArn": "arn:aws:bedrock-agentcore:us-east-1:111111111111:runtime/cfn_crawler-30OD06FRns",
                 "sessionId.$": "$.analysisId",
                 "inputText.$": "States.Format('Extract all security-relevant properties from the CloudFormation resource documentation at: {}', $.resourceUrl)"
             }),
             result_path="$.crawlResult",
             retry_on_service_exceptions=True,
         )
-        
+
         # Add retry logic for crawler
         crawl_documentation.add_retry(
             backoff_rate=2.0,
@@ -285,7 +309,7 @@ def handler(event, context):
             max_attempts=3,
             errors=["States.TaskFailed", "States.Timeout", "Lambda.ServiceException"],
         )
-        
+
         # 2b. Notify progress after crawl
         notify_crawl_complete = tasks.LambdaInvoke(
             self,
@@ -306,21 +330,36 @@ def handler(event, context):
             errors=["States.ALL"],
             result_path="$.notifyCrawlError",
         )
-        
+
+        # 2c. Compute totalProperties before entering the Map state
+        compute_total_properties = sfn.Pass(
+            self,
+            "ComputeTotalProperties",
+            comment="Compute the total number of properties before the Map state",
+            parameters={
+                "analysisId.$": "$.analysisId",
+                "resourceUrl.$": "$.resourceUrl",
+                "crawlResult.$": "$.crawlResult",
+                "totalProperties.$": "States.ArrayLength($.crawlResult.Payload.result.properties)",
+            },
+        )
+
         # 3. Analyze properties in parallel (Map state with max 8 concurrent)
         analyze_single_property = tasks.LambdaInvoke(
             self,
             "AnalyzeSingleProperty",
             lambda_function=self.property_analyzer_invoker,
             payload=sfn.TaskInput.from_object({
-                "agentArn": "arn:aws:bedrock-agentcore:us-east-1:YOUR_AWS_ACCOUNT_ID:runtime/cfn_property_analyzer-YOUR_AGENT_ID",
+                "agentArn": "arn:aws:bedrock-agentcore:us-east-1:111111111111:runtime/cfn_property_analyzer-1r49DI2B44",
                 "sessionId.$": "States.Format('{}-{}', $.analysisId, $.property.name)",
-                "inputText.$": "States.Format('Perform detailed security analysis of the CloudFormation property \"{}\" from resource at: {}. Property description: {}', $.property.name, $.resourceUrl, $.property.description)"
+                "inputText.$": "States.Format('Perform detailed security analysis of the CloudFormation property \"{}\" from resource at: {}. Property description: {}', $.property.name, $.resourceUrl, $.property.description)",
+                "resourceUrl.$": "$.resourceUrl",
+                "property.$": "$.property",
             }),
             result_path="$.propertyResult",
             retry_on_service_exceptions=True,
         )
-        
+
         # Add retry logic for property analyzer
         analyze_single_property.add_retry(
             backoff_rate=2.0,
@@ -328,7 +367,36 @@ def handler(event, context):
             max_attempts=3,
             errors=["States.TaskFailed", "States.Timeout", "Lambda.ServiceException"],
         )
-        
+
+        # 3a. Notify per-property progress after each property analysis
+        notify_property_analyzed = tasks.LambdaInvoke(
+            self,
+            "NotifyPropertyAnalyzed",
+            lambda_function=self.progress_notifier,
+            payload=sfn.TaskInput.from_object({
+                "analysisId.$": "$.analysisId",
+                "step": "property_analyzed",
+                "status": "COMPLETED",
+                "detail": {
+                    "property.$": "$.property",
+                    "result.$": "$.propertyResult.Payload",
+                    "index.$": "$.index",
+                    "total.$": "$.totalProperties",
+                },
+            }),
+            result_path="$.notifyPropertyResult",
+            retry_on_service_exceptions=True,
+        )
+        # Notification failures should not break the property analysis pipeline
+        notify_property_analyzed.add_catch(
+            handler=sfn.Pass(self, "IgnorePropertyNotifyError", result_path=sfn.JsonPath.DISCARD),
+            errors=["States.ALL"],
+            result_path="$.notifyPropertyError",
+        )
+
+        # Chain: AnalyzeSingleProperty → NotifyPropertyAnalyzed
+        map_iterator_chain = analyze_single_property.next(notify_property_analyzed)
+
         # Map state for parallel property analysis
         analyze_properties_map = sfn.Map(
             self,
@@ -336,14 +404,16 @@ def handler(event, context):
             items_path="$.crawlResult.Payload.result.properties",
             parameters={
                 "property.$": "$$.Map.Item.Value",
+                "index.$": "$$.Map.Item.Index",
                 "analysisId.$": "$.analysisId",
                 "resourceUrl.$": "$.resourceUrl",
+                "totalProperties.$": "$.totalProperties",
             },
             max_concurrency=self.config.max_concurrent_properties,
             result_path="$.analysisResults",
         )
-        analyze_properties_map.iterator(analyze_single_property)
-        
+        analyze_properties_map.iterator(map_iterator_chain)
+
         # 3b. Notify progress after property analysis
         notify_analysis_complete = tasks.LambdaInvoke(
             self,
@@ -363,7 +433,7 @@ def handler(event, context):
             errors=["States.ALL"],
             result_path="$.notifyAnalysisError",
         )
-        
+
         # 4. Aggregate results
         aggregate_results = sfn.Pass(
             self,
@@ -382,7 +452,7 @@ def handler(event, context):
             },
             result_path="$.finalResult",
         )
-        
+
         # 5. Update DynamoDB with results
         update_with_results = tasks.DynamoUpdateItem(
             self,
@@ -414,7 +484,7 @@ def handler(event, context):
             },
             result_path=sfn.JsonPath.DISCARD,
         )
-        
+
         # 6. Handle errors - update status to FAILED
         handle_error = tasks.DynamoUpdateItem(
             self,
@@ -441,14 +511,14 @@ def handler(event, context):
             },
             result_path=sfn.JsonPath.DISCARD,
         )
-        
+
         # Success state
         success = sfn.Succeed(
             self,
             "AnalysisComplete",
             comment="Analysis completed successfully",
         )
-        
+
         # 6b. Notify workflow complete
         notify_workflow_complete = tasks.LambdaInvoke(
             self,
@@ -468,7 +538,7 @@ def handler(event, context):
             errors=["States.ALL"],
             result_path="$.notifyCompleteError",
         )
-        
+
         # Failure state
         failure = sfn.Fail(
             self,
@@ -476,12 +546,13 @@ def handler(event, context):
             comment="Analysis failed",
             cause="Workflow execution failed",
         )
-        
+
         # Chain states together
         definition = (
             update_status_in_progress
             .next(crawl_documentation)
             .next(notify_crawl_complete)
+            .next(compute_total_properties)
             .next(analyze_properties_map)
             .next(notify_analysis_complete)
             .next(aggregate_results)
@@ -489,23 +560,23 @@ def handler(event, context):
             .next(notify_workflow_complete)
             .next(success)
         )
-        
+
         # Add catch for errors
         crawl_documentation.add_catch(
             handler=handle_error,
             errors=["States.ALL"],
             result_path="$.error",
         )
-        
+
         analyze_properties_map.add_catch(
             handler=handle_error,
             errors=["States.ALL"],
             result_path="$.error",
         )
-        
+
         # Chain error handler to failure
         handle_error.next(failure)
-        
+
         # Create log group for state machine
         log_group = logs.LogGroup(
             self,
@@ -513,25 +584,25 @@ def handler(event, context):
             log_group_name=f"/aws/vendedlogs/states/cfn-security-workflow-{self.config.environment_name}",
             retention=logs.RetentionDays.ONE_WEEK if self.config.environment_name == "dev" else logs.RetentionDays.ONE_MONTH,
         )
-        
+
         # Create IAM role for state machine
         state_machine_role = iam.Role(
             self,
             "StateMachineRole",
             assumed_by=iam.ServicePrincipal("states.amazonaws.com"),
         )
-        
+
         # Grant permissions to invoke Lambda functions
         self.crawler_invoker.grant_invoke(state_machine_role)
         self.property_analyzer_invoker.grant_invoke(state_machine_role)
         self.progress_notifier.grant_invoke(state_machine_role)
-        
+
         # Grant permissions to access DynamoDB
         self.analysis_table.grant_read_write_data(state_machine_role)
-        
+
         # Grant permissions to write logs
         log_group.grant_write(state_machine_role)
-        
+
         # Create state machine
         state_machine = sfn.StateMachine(
             self,
@@ -547,5 +618,5 @@ def handler(event, context):
                 include_execution_data=True,
             ),
         )
-        
+
         return state_machine

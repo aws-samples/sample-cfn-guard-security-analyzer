@@ -14,6 +14,7 @@ let websocket = null;
 let reconnectAttempts = 0;
 let elapsedTimerInterval = null;
 let elapsedSeconds = 0;
+let renderedPropertyNames = new Set();
 
 // DOM elements
 const analysisForm = document.getElementById('analysisForm');
@@ -147,7 +148,8 @@ function handleFormSubmit(e) {
         return;
     }
     
-    startAnalysis(url);
+    const analysisType = document.querySelector('input[name="analysisType"]:checked').value;
+    startAnalysis(url, analysisType);
 }
 
 /**
@@ -157,6 +159,7 @@ async function startAnalysis(url, analysisType = 'quick') {
     // Reset UI state: hide all sections and clear previous results
     hideAllSections();
     resultsSection.innerHTML = '';
+    renderedPropertyNames.clear();
     progressSection.classList.remove('hidden');
     
     // Start elapsed timer
@@ -291,30 +294,38 @@ function connectWebSocket() {
 /**
  * Handle WebSocket messages
  */
+/**
+ * Handle WebSocket messages
+ */
 function handleWebSocketMessage(data) {
+    // Existing type/action routing (for forward compatibility)
     const messageType = data.type || data.action;
-    
-    switch (messageType) {
-        case 'progress':
-            handleProgressUpdate(data);
-            break;
-            
-        case 'property_complete':
-            handlePropertyComplete(data);
-            break;
-            
-        case 'analysis_complete':
-            handleAnalysisComplete(data);
-            break;
-            
-        case 'error':
-            handleError(data);
-            break;
-            
-        default:
-            console.log('Unknown message type:', messageType, data);
+    if (messageType) {
+        switch (messageType) {
+            case 'progress': return handleProgressUpdate(data);
+            case 'property_complete': return handlePropertyComplete(data);
+            case 'analysis_complete': return handleAnalysisComplete(data);
+            case 'error': return handleError(data);
+        }
     }
+
+    // Backend step-based messages from Step Functions workflow
+    const step = data.step;
+    if (step) {
+        switch (step) {
+            case 'crawl': return handleStepCrawlComplete(data);
+            case 'property_analyzed': return handleStepPropertyAnalyzed(data);
+            case 'analyze': return handleStepAnalyzeComplete(data);
+            case 'complete': return handleStepWorkflowComplete(data);
+            default:
+                console.log('Unknown step:', step, data);
+                return;
+        }
+    }
+
+    console.log('Unrecognized WebSocket message:', data);
 }
+
 
 /**
  * Handle progress update
@@ -388,6 +399,184 @@ function handleError(data) {
 }
 
 /**
+ * Handle step-based crawl complete message from detailed analysis workflow.
+ * Updates progress to ~20% and logs crawl completion.
+ */
+function handleStepCrawlComplete(data) {
+    updateProgress(20, 'Documentation crawl completed');
+    addActivityLogEntry(
+        '📄 Crawl Complete',
+        data.detail?.message || 'Documentation crawling is complete',
+        'success'
+    );
+}
+
+/**
+ * Parse text that may contain numbered items (e.g., "1. Do X 2. Do Y") into
+ * an HTML ordered list. Returns <ol> with <li> items when 2+ items are found,
+ * a <span> with plain text for non-list content, or empty string for empty input.
+ */
+function parseNumberedList(text) {
+    if (!text) return '';
+
+    // Try "1. " format first, then "1) " format
+    let items = text.split(/(?:^|\s)(?=\d+\.\s)/).filter(s => s.trim());
+    let prefixRegex = /^\d+\.\s*/;
+
+    if (items.length < 2) {
+        // Try "1) " format (some agents use parentheses)
+        items = text.split(/(?:^|[\s:])(?=\d+\)\s)/).filter(s => s.trim());
+        prefixRegex = /^\d+\)\s*/;
+    }
+
+    if (items.length >= 2) {
+        const listItems = items.map(item => {
+            const cleaned = item.replace(prefixRegex, '').trim();
+            return `<li>${cleaned}</li>`;
+        });
+        return `<ol class="list-decimal list-inside space-y-1 text-sm text-gray-700">${listItems.join('')}</ol>`;
+    }
+
+    return `<span>${text}</span>`;
+}
+
+/**
+ * Normalize a property object from the Step Functions Map iteration output.
+ * The Map output has: {property: {name, description}, propertyResult: {Payload: {...}}, index, totalProperties}
+ * The analysis result (propertyResult.Payload) may contain the actual analysis or an error.
+ * We merge the property metadata with the analysis result to produce a flat object
+ * that createPropertyCard() can render.
+ */
+function normalizePropertyData(raw) {
+    // If it already has a name and risk_level at top level, it's already normalized
+    if (raw.name && raw.risk_level) return raw;
+
+    // Extract property metadata (from crawler)
+    const propMeta = raw.property || {};
+    // Extract analysis result (from property analyzer Lambda)
+    // In DynamoDB results: raw.propertyResult.Payload = {statusCode, resourceUrl, propertyName, result: "<text>"}
+    // In WebSocket messages: raw.result = {statusCode, resourceUrl, propertyName, result: "<text>"}
+    const analysisPayload = raw.propertyResult?.Payload || raw.result || raw.Payload || {};
+
+    // The analysis result might be a parsed JSON object with analysis fields,
+    // or it might be a raw text response that needs JSON extraction
+    let analysis = {};
+    if (typeof analysisPayload === 'string') {
+        try {
+            const jsonMatch = analysisPayload.match(/\{[\s\S]*\}/);
+            if (jsonMatch) analysis = JSON.parse(jsonMatch[0]);
+        } catch (e) { /* ignore */ }
+    } else if (typeof analysisPayload === 'object' && !analysisPayload.error) {
+        // The agent returns {statusCode, resourceUrl, propertyName, result: "<text with JSON>"}
+        // Extract the JSON from the result field
+        const resultText = analysisPayload.result || '';
+        if (typeof resultText === 'string' && resultText.length > 0) {
+            // Find balanced JSON object in the text by tracking brace depth
+            const startIdx = resultText.indexOf('{');
+            if (startIdx !== -1) {
+                let depth = 0;
+                let endIdx = -1;
+                for (let i = startIdx; i < resultText.length; i++) {
+                    if (resultText[i] === '{') depth++;
+                    else if (resultText[i] === '}') {
+                        depth--;
+                        if (depth === 0) { endIdx = i; break; }
+                    }
+                }
+                if (endIdx !== -1) {
+                    try {
+                        analysis = JSON.parse(resultText.substring(startIdx, endIdx + 1));
+                    } catch (e) { /* ignore parse errors */ }
+                }
+            }
+        } else if (typeof resultText === 'object') {
+            analysis = resultText;
+        }
+    }
+
+    return {
+        name: analysis.propertyName || analysis.name || propMeta.name || raw.name || 'Unknown Property',
+        risk_level: analysis.riskLevel || analysis.risk_level || propMeta.risk_level || 'MEDIUM',
+        description: analysis.description || propMeta.description || '',
+        security_impact: analysis.securityImplications || analysis.security_impact || analysis.securityImplication || propMeta.description || '',
+        key_threat: analysis.key_threat || (analysis.commonMisconfigurations ? analysis.commonMisconfigurations[0] : '') || '',
+        secure_configuration: analysis.secure_configuration || analysis.recommendations || analysis.recommendation || '',
+        recommendation: analysis.recommendations || analysis.recommendation || analysis.secure_configuration || '',
+        property_path: propMeta.name || raw.name || '',
+        best_practices: analysis.bestPractices || [],
+        common_misconfigurations: analysis.commonMisconfigurations || [],
+    };
+}
+
+/**
+ * Handle step-based property analyzed message from detailed analysis workflow.
+ * Renders property card incrementally and updates progress proportionally between 20-90%.
+ */
+function handleStepPropertyAnalyzed(data) {
+    const detail = data.detail || {};
+    const index = detail.index || 0;
+    const total = detail.total || 1;
+
+    // Normalize the property data from the notification payload
+    const property = normalizePropertyData(detail);
+
+    // Calculate progress: scale between 20% (crawl done) and 90% (all properties done)
+    const percent = Math.round(20 + ((index + 1) / total) * 70);
+    updateProgress(percent, `Analyzing property ${index + 1} of ${total}`);
+
+    // Track this property as already rendered via WebSocket
+    if (property.name) {
+        renderedPropertyNames.add(property.name);
+    }
+
+    // Show results section and render property card incrementally (no index — cards arrive out of order)
+    resultsSection.classList.remove('hidden');
+    addPropertyCardToUI(property);
+
+    // Activity log
+    const riskIcon = getRiskIcon(property.risk_level);
+    addActivityLogEntry(
+        `${riskIcon} ${property.name || 'Property'}`,
+        `${property.risk_level || 'MEDIUM'} risk — property ${index + 1}/${total}`,
+        'success'
+    );
+}
+
+/**
+ * Handle step-based analyze complete message from detailed analysis workflow.
+ * Updates progress to ~90% indicating all property analysis is done.
+ */
+function handleStepAnalyzeComplete(data) {
+    updateProgress(90, 'Property analysis completed');
+    addActivityLogEntry(
+        '🔍 Analysis Complete',
+        data.detail?.message || 'All property analysis is complete',
+        'success'
+    );
+}
+
+/**
+ * Handle step-based workflow complete message from detailed analysis workflow.
+ * Updates progress to 100%, fetches final results, and resets the UI.
+ */
+async function handleStepWorkflowComplete(data) {
+    updateProgress(100, 'Analysis complete');
+    addActivityLogEntry(
+        '✅ Workflow Complete',
+        data.detail?.message || 'Detailed analysis workflow completed',
+        'success'
+    );
+
+    // Fetch final results and display them
+    if (currentSessionId) {
+        await fetchResults(currentSessionId);
+    }
+
+    hideProgressSection();
+}
+
+
+/**
  * Fetch analysis results
  */
 async function fetchResults(analysisId) {
@@ -459,13 +648,13 @@ function displayQuickScanResults(results) {
     const container = document.getElementById('propertiesContainer');
     
     // Add each property card
-    properties.forEach(property => {
+    properties.forEach((property, index) => {
         const card = createPropertyCard({
             name: property.name,
             risk_level: property.riskLevel,
             security_impact: property.securityImplication,
             recommendation: property.recommendation
-        });
+        }, index);
         card.classList.add('animate-fade-in');
         container.appendChild(card);
     });
@@ -477,15 +666,77 @@ function displayQuickScanResults(results) {
  * Display results
  */
 function displayResults(results) {
-    // Implementation depends on results structure
-    // This is a placeholder that should be expanded based on actual API response
-    console.log('Displaying results:', results);
+    try {
+        // Parse the results.S JSON string from the DynamoDB response
+        let parsedResults;
+        if (results.results && results.results.S) {
+            parsedResults = JSON.parse(results.results.S);
+        } else if (results.results && typeof results.results === 'string') {
+            parsedResults = JSON.parse(results.results);
+        } else if (results.results && results.results.properties) {
+            parsedResults = results.results;
+        } else {
+            console.warn('No results.S field found in response:', results);
+            showError('No analysis results found');
+            analyzeBtn.disabled = false;
+            analyzeBtn.innerHTML = '<i class="fas fa-search mr-2"></i>Start Security Analysis';
+            return;
+        }
+
+        // Extract properties array — each element may be wrapped in a Payload key
+        const rawProperties = parsedResults.properties || [];
+        const properties = rawProperties.map(prop => {
+            if (prop && prop.Payload) {
+                return prop.Payload;
+            }
+            return prop;
+        });
+
+        // Show results section
+        resultsSection.classList.remove('hidden');
+
+        // Always rebuild the results container so cards appear in correct order
+        // (incremental WebSocket rendering may have added cards out of order)
+        resultsSection.innerHTML = `
+            <div class="bg-white rounded-xl card-shadow p-8">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h3 class="text-2xl font-bold text-gray-800">Security Analysis Results</h3>
+                        <p class="text-gray-600 mt-1">Found ${properties.length} security-relevant properties</p>
+                    </div>
+                    <div class="text-sm text-gray-500">
+                        <i class="fas fa-clock mr-1"></i>
+                        ${new Date().toLocaleTimeString()}
+                    </div>
+                </div>
+                <div id="propertiesContainer" class="space-y-4"></div>
+            </div>
+        `;
+        let container = document.getElementById('propertiesContainer');
+
+        // Render all property cards in order
+        properties.forEach((property, index) => {
+            const normalized = normalizePropertyData(property);
+            const card = createPropertyCard(normalized, index);
+            card.classList.add('animate-fade-in');
+            container.appendChild(card);
+        });
+
+    } catch (error) {
+        console.error('Error displaying results:', error);
+        showError('Failed to display analysis results: ' + error.message);
+    }
+
+    // Re-enable form button and hide progress section
+    analyzeBtn.disabled = false;
+    analyzeBtn.innerHTML = '<i class="fas fa-search mr-2"></i>Start Security Analysis';
+    hideProgressSection();
 }
 
 /**
  * Add property card to UI
  */
-function addPropertyCardToUI(property) {
+function addPropertyCardToUI(property, index) {
     // Create results container if it doesn't exist
     let container = document.getElementById('propertiesContainer');
     if (!container) {
@@ -499,7 +750,7 @@ function addPropertyCardToUI(property) {
     }
     
     // Create property card
-    const card = createPropertyCard(property);
+    const card = createPropertyCard(property, index);
     card.classList.add('animate-fade-in');
     container.appendChild(card);
 }
@@ -507,14 +758,29 @@ function addPropertyCardToUI(property) {
 /**
  * Create property card element
  */
-function createPropertyCard(property) {
+function createPropertyCard(property, index) {
     const riskLevel = property.risk_level || 'MEDIUM';
     const riskClass = `risk-${riskLevel.toLowerCase()}`;
     const config = getRiskConfig(riskLevel);
-    
+
     const card = document.createElement('div');
     card.className = `property-card bg-white rounded-xl card-shadow p-6 border border-gray-200 ${riskClass}`;
-    
+
+    // Build recommendation HTML using parseNumberedList
+    const recommendationText = property.secure_configuration || property.recommendation;
+    const recommendationHtml = recommendationText ? `
+                <div>
+                    <div class="text-sm font-semibold text-gray-800 mb-2">Recommendation</div>
+                    <div class="text-sm text-gray-700 bg-green-50 border border-green-100 rounded-lg p-3">
+                        <i class="fas fa-shield-alt text-green-600 mr-2"></i>
+                        ${parseNumberedList(recommendationText)}
+                    </div>
+                </div>
+            ` : '';
+
+    // Title with optional index prefix
+    const titlePrefix = typeof index === 'number' ? (index + 1) + '. ' : '';
+
     card.innerHTML = `
         <div class="flex items-start justify-between mb-4">
             <div class="flex items-start flex-1">
@@ -522,25 +788,25 @@ function createPropertyCard(property) {
                     <i class="${config.icon} text-lg" style="color: ${config.color};"></i>
                 </div>
                 <div class="flex-1">
-                    <h4 class="text-lg font-bold text-gray-900">${property.name || 'Unknown Property'}</h4>
+                    <h4 class="text-lg font-bold text-gray-900">${titlePrefix}${property.name || 'Unknown Property'}</h4>
                     <div class="text-sm text-gray-500">${property.property_path || property.name || 'N/A'}</div>
                 </div>
             </div>
             <div class="flex items-center space-x-3 ml-4">
-                <div class="flex items-center px-3 py-1 rounded-full text-sm font-medium border" 
+                <div class="flex items-center px-3 py-1 rounded-full text-sm font-medium border"
                      style="background-color: ${config.bgColor}; border-color: ${config.color}20; color: ${config.color};">
                     <i class="${config.icon} mr-2" style="color: ${config.color};"></i>
                     ${riskLevel}
                 </div>
             </div>
         </div>
-        
+
         <div class="space-y-4">
             <div>
                 <div class="text-sm font-semibold text-gray-800 mb-2">Security Impact</div>
                 <div class="text-sm text-gray-700 leading-relaxed">${property.security_impact || property.securityImplication || 'No description available'}</div>
             </div>
-            
+
             ${property.key_threat ? `
                 <div>
                     <div class="text-sm font-semibold text-gray-800 mb-2">Key Threat</div>
@@ -550,19 +816,11 @@ function createPropertyCard(property) {
                     </div>
                 </div>
             ` : ''}
-            
-            ${property.secure_configuration || property.recommendation ? `
-                <div>
-                    <div class="text-sm font-semibold text-gray-800 mb-2">Recommendation</div>
-                    <div class="text-sm text-gray-700 bg-green-50 border border-green-100 rounded-lg p-3">
-                        <i class="fas fa-shield-alt text-green-600 mr-2"></i>
-                        ${property.secure_configuration || property.recommendation}
-                    </div>
-                </div>
-            ` : ''}
+
+            ${recommendationHtml}
         </div>
     `;
-    
+
     return card;
 }
 
@@ -773,7 +1031,7 @@ function handleSSEEvent(sseEvent) {
                 risk_level: data.riskLevel,
                 security_impact: data.securityImplication,
                 recommendation: data.recommendation
-            });
+            }, data.index);
             card.classList.add('animate-fade-in');
             container.appendChild(card);
 
@@ -924,3 +1182,11 @@ window.addEventListener('beforeunload', function() {
         websocket.close();
     }
 });
+
+// Expose functions for testing
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { parseNumberedList, createPropertyCard };
+} else if (typeof window !== 'undefined') {
+    window.parseNumberedList = parseNumberedList;
+    window.createPropertyCard = createPropertyCard;
+}

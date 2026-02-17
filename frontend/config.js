@@ -9,14 +9,14 @@ const USE_EKS = true;  // Toggle: true = EKS (new), false = API Gateway (legacy 
 
 // EKS backend endpoints (new)
 const EKS_ENDPOINTS = {
-    API_BASE_URL: 'https://cfn-analyzer.YOUR_DOMAIN',
-    WEBSOCKET_URL: 'wss://cfn-analyzer.YOUR_DOMAIN/ws',
+    API_BASE_URL: 'https://cfn-analyzer.gangprab.people.aws.dev',
+    WEBSOCKET_URL: 'wss://cfn-analyzer.gangprab.people.aws.dev/ws',
 };
 
 // Legacy API Gateway endpoints (fallback — DO NOT DELETE)
 const LEGACY_ENDPOINTS = {
-    API_BASE_URL: 'https://YOUR_REST_API_ID.execute-api.us-east-1.amazonaws.com/dev',
-    WEBSOCKET_URL: 'wss://YOUR_WS_API_ID.execute-api.us-east-1.amazonaws.com/dev',
+    API_BASE_URL: 'https://6uyvwqy865.execute-api.us-east-1.amazonaws.com/dev',
+    WEBSOCKET_URL: 'wss://04hecd5eqj.execute-api.us-east-1.amazonaws.com/dev',
 };
 
 const ACTIVE = USE_EKS ? EKS_ENDPOINTS : LEGACY_ENDPOINTS;

@@ -42,7 +42,7 @@ stepfunctions_stack = StepFunctionsStack(
     f"CfnSecurityAnalyzer-StepFunctions-{config.environment_name}",
     config=config,
     analysis_table=database_stack.analysis_table,
-    alb_endpoint_url="https://cfn-analyzer.YOUR_DOMAIN",
+    alb_endpoint_url="https://cfn-analyzer.gangprab.people.aws.dev",
     env=cdk.Environment(account=config.account, region=config.region)
 )
 
