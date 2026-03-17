@@ -1,5 +1,7 @@
 # CloudFormation Security Analyzer
 
+> **Important:** This is sample code for demonstration and educational purposes only. It is not intended for production use without further review and hardening. You should work with your security and legal teams to meet your organizational security, regulatory, and compliance requirements before deployment.
+
 An AI-powered tool that automatically analyzes AWS CloudFormation resource configurations for security vulnerabilities. Point it at any CloudFormation resource documentation URL and it identifies security-critical properties, assesses risk levels, and provides actionable remediation recommendations — powered by Amazon Bedrock AgentCore and Claude.
 
 ## Why This Exists
@@ -67,7 +69,7 @@ All three agents are built with the [Strands Agents SDK](https://github.com/stra
 | AI/ML | Bedrock AgentCore, Strands Agents SDK, Claude 3.5 Sonnet |
 | Workflow | AWS Step Functions + Lambda |
 | Database | Amazon DynamoDB |
-| Frontend | Vanilla HTML, JavaScript, CSS (Tailwind) |
+| Frontend | React, TypeScript, Vite |
 | PDF Generation | ReportLab |
 | Testing | pytest, Hypothesis (property-based testing), moto |
 | Language | Python 3.11 throughout |
@@ -100,11 +102,13 @@ All three agents are built with the [Strands Agents SDK](https://github.com/stra
 │   ├── crawler_agent.py            #   Documentation crawler agent
 │   └── property_analyzer_agent.py  #   Detailed property analysis agent
 ├── lambda/                         # Lambda functions (used by Step Functions)
-├── frontend/                       # Static SPA (no build step required)
-│   ├── index.html
-│   ├── app.js                      #   SSE client, WebSocket client, UI logic
-│   ├── config.js                   #   API endpoint configuration
-│   └── styles.css
+├── frontend/                       # React + TypeScript SPA (Vite)
+│   └── src/
+│       ├── App.tsx                  #   Root component
+│       ├── config.ts               #   API endpoint configuration
+│       ├── components/             #   UI components (InputSection, ResultsSection, etc.)
+│       ├── hooks/                  #   Custom hooks (useSSE, useWebSocket, useAnalysis)
+│       └── utils/                  #   Utility functions
 └── tests/unit/                     # pytest + Hypothesis property-based tests
 ```
 
@@ -130,9 +134,10 @@ pip install -r service/requirements.txt  # FastAPI service (local dev)
 
 ### Configure
 
-1. Set your AWS account ID in `config.py`
-2. After deploying agents, update agent IDs in `service/routers/analysis.py` and `lambda/analysis_orchestrator.py`
-3. After deploying infrastructure, update `frontend/config.js` with your API endpoints
+1. Set your AWS account ID in `config.py` (replace `111111111111`)
+2. Deploy the three Bedrock AgentCore agents from `agents/` and note their runtime ARNs
+3. Set agent ARNs as environment variables or update them in `stacks/stepfunctions_stack.py` and `service/routers/analysis.py`
+4. After deploying infrastructure, update `frontend/src/config.ts` with your API endpoints
 
 ### Deploy
 
@@ -198,6 +203,10 @@ Three environments in `config.py`: `dev`, `staging`, `prod`. Controlled via `CDK
 CDK_ENVIRONMENT=staging cdk deploy --all
 ```
 
+## Security
+
+See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
+
 ## License
 
-MIT
+This library is licensed under the MIT-0 License. See the [LICENSE](LICENSE) file.

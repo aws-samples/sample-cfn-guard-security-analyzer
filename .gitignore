@@ -41,6 +41,18 @@ frontend-backup/
 ~/
 STAR-pitch.html
 
+# Built frontend assets
+frontend/dist/
+
+# Kiro internal files
+.kiro/
+
+# AgentCore deployment state
+agents/.bedrock_agentcore.yaml
+
+# CDK context (account-specific)
+cdk.context.json
+
 # Status/notes markdown — local dev journal, not project docs
 AGENTCORE_API_FIX.md
 AGENTCORE_DEPLOYMENT.md

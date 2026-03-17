@@ -3,6 +3,7 @@
 import os
 
 import aws_cdk as cdk
+from cdk_nag import AwsSolutionsChecks
 
 from config import get_environment_config
 
@@ -42,7 +43,7 @@ stepfunctions_stack = StepFunctionsStack(
     f"CfnSecurityAnalyzer-StepFunctions-{config.environment_name}",
     config=config,
     analysis_table=database_stack.analysis_table,
-    alb_endpoint_url="https://cfn-analyzer.gangprab.people.aws.dev",
+    alb_endpoint_url="",  # Set to your ALB endpoint URL after deployment
     env=cdk.Environment(account=config.account, region=config.region)
 )
 
@@ -70,5 +71,8 @@ monitoring_stack = MonitoringStack(
 # Apply tags to all resources
 for key, value in config.tags.items():
     cdk.Tags.of(app).add(key, value)
+
+# cdk_nag: AWS Solutions security checks
+cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
 
 app.synth()

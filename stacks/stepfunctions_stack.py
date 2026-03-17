@@ -23,23 +23,28 @@ class StepFunctionsStack(Stack):
         config: EnvironmentConfig,
         analysis_table,
         alb_endpoint_url: str = "",
+        crawler_agent_arn: str = "",  # Deploy your crawler agent and provide its ARN
+        property_analyzer_agent_arn: str = "",  # Deploy your property analyzer agent and provide its ARN
         **kwargs
     ):
         super().__init__(scope, construct_id, **kwargs)
-        
+
         self.config = config
         self.analysis_table = analysis_table
         self.alb_endpoint_url = alb_endpoint_url
-        
+        self.crawler_agent_arn = crawler_agent_arn
+        self.property_analyzer_agent_arn = property_analyzer_agent_arn
+
         # Create agent invoker Lambda functions
+        # Users must deploy their own Bedrock AgentCore agents and provide the ARNs
         self.crawler_invoker = self._create_agent_invoker_lambda(
             "CrawlerInvoker",
-            "arn:aws:bedrock-agentcore:us-east-1:111111111111:runtime/cfn_crawler-30OD06FRns"
+            self.crawler_agent_arn
         )
-        
+
         self.property_analyzer_invoker = self._create_agent_invoker_lambda(
             "PropertyAnalyzerInvoker",
-            "arn:aws:bedrock-agentcore:us-east-1:111111111111:runtime/cfn_property_analyzer-1r49DI2B44"
+            self.property_analyzer_agent_arn
         )
         
         # Create progress notifier Lambda
@@ -294,7 +299,7 @@ def handler(event, context):
             "CrawlDocumentation",
             lambda_function=self.crawler_invoker,
             payload=sfn.TaskInput.from_object({
-                "agentArn": "arn:aws:bedrock-agentcore:us-east-1:111111111111:runtime/cfn_crawler-30OD06FRns",
+                "agentArn": self.crawler_agent_arn,  # Provide your deployed crawler agent ARN
                 "sessionId.$": "$.analysisId",
                 "inputText.$": "States.Format('Extract all security-relevant properties from the CloudFormation resource documentation at: {}', $.resourceUrl)"
             }),
@@ -350,7 +355,7 @@ def handler(event, context):
             "AnalyzeSingleProperty",
             lambda_function=self.property_analyzer_invoker,
             payload=sfn.TaskInput.from_object({
-                "agentArn": "arn:aws:bedrock-agentcore:us-east-1:111111111111:runtime/cfn_property_analyzer-1r49DI2B44",
+                "agentArn": self.property_analyzer_agent_arn,  # Provide your deployed property analyzer agent ARN
                 "sessionId.$": "States.Format('{}-{}', $.analysisId, $.property.name)",
                 "inputText.$": "States.Format('Perform detailed security analysis of the CloudFormation property \"{}\" from resource at: {}. Property description: {}', $.property.name, $.resourceUrl, $.property.description)",
                 "resourceUrl.$": "$.resourceUrl",
