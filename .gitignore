@@ -11,13 +11,10 @@ __pycache__/
 # CDK
 .cdk.staging
 cdk.out/
-cdk.out.deploy/
-cdk.out.deploy2/
-cdk.out.deploy3/
+cdk.context.json
 
-# Node (CDK installs)
+# Node
 node_modules/
-package.json
 package-lock.json
 
 # Test caches
@@ -28,41 +25,16 @@ package-lock.json
 .DS_Store
 Thumbs.db
 
-# IDE / Kiro local
-powers/
-
-# AgentCore build artifacts (code is tracked, zips are not)
-agents/.bedrock_agentcore/
-
-# Local-only files — not reusable
-deploy-frontend.sh
-deploy-with-agents.sh
-frontend-backup/
-~/
-STAR-pitch.html
-
 # Built frontend assets
 frontend/dist/
 
-# Kiro internal files
+# IDE and local dev files
 .kiro/
+.claude.local.md
 
-# AgentCore deployment state
+# AgentCore
+agents/.bedrock_agentcore/
 agents/.bedrock_agentcore.yaml
 
-# CDK context (account-specific)
-cdk.context.json
-
-# Status/notes markdown — local dev journal, not project docs
-AGENTCORE_API_FIX.md
-AGENTCORE_DEPLOYMENT.md
-AGENT_INTEGRATION_COMPLETE.md
-ANALYSIS_FLOW_AND_COMPARISON.md
-DEPLOYMENT_SUMMARY.md
-DETAILED_ANALYSIS_STATUS.md
-FRONTEND_DEPLOYMENT.md
-MONITORING_IMPLEMENTATION.md
-MVP_COMPLETE.md
-READY_TO_TEST.md
-STEP_FUNCTIONS_FIX_NEEDED.md
-SYSTEM_READY.md
+# Local scripts and notes (not project docs)
+*.local.*
