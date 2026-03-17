@@ -24,6 +24,9 @@ STATE_MACHINE_ARN = os.environ.get('STATE_MACHINE_ARN')
 # AgentCore agent ARN — set via environment variable after deploying your agent
 SECURITY_ANALYZER_AGENT_ARN = os.environ.get('SECURITY_ANALYZER_AGENT_ARN', '')
 
+# CORS origin — restrict to your domain for production use
+CORS_ORIGIN = os.environ.get('CORS_ORIGIN', '*')
+
 # Get DynamoDB table
 analysis_table = dynamodb.Table(ANALYSIS_TABLE_NAME)
 
@@ -247,7 +250,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'statusCode': 400,
                     'headers': {
                         'Content-Type': 'application/json',
-                        'Access-Control-Allow-Origin': '*'
+                        'Access-Control-Allow-Origin': CORS_ORIGIN
                     },
                     'body': json.dumps({'error': 'Missing analysisId in path'})
                 }
@@ -260,7 +263,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         'statusCode': 404,
                         'headers': {
                             'Content-Type': 'application/json',
-                            'Access-Control-Allow-Origin': '*'
+                            'Access-Control-Allow-Origin': CORS_ORIGIN
                         },
                         'body': json.dumps({'error': 'Analysis not found'})
                     }
@@ -270,7 +273,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'statusCode': 200,
                     'headers': {
                         'Content-Type': 'application/json',
-                        'Access-Control-Allow-Origin': '*'
+                        'Access-Control-Allow-Origin': CORS_ORIGIN
                     },
                     'body': json.dumps(response['Item'], default=str)
                 }
@@ -280,7 +283,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'statusCode': 500,
                     'headers': {
                         'Content-Type': 'application/json',
-                        'Access-Control-Allow-Origin': '*'
+                        'Access-Control-Allow-Origin': CORS_ORIGIN
                     },
                     'body': json.dumps({'error': 'Failed to retrieve analysis'})
                 }
@@ -293,7 +296,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'statusCode': 400,
                 'headers': {
                     'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
+                    'Access-Control-Allow-Origin': CORS_ORIGIN
                 },
                 'body': json.dumps({'error': error_msg})
             }
@@ -330,7 +333,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'statusCode': 200,
                     'headers': {
                         'Content-Type': 'application/json',
-                        'Access-Control-Allow-Origin': '*'
+                        'Access-Control-Allow-Origin': CORS_ORIGIN
                     },
                     'body': json.dumps({
                         'analysisId': analysis_id,
@@ -350,7 +353,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'statusCode': 500,
                     'headers': {
                         'Content-Type': 'application/json',
-                        'Access-Control-Allow-Origin': '*'
+                        'Access-Control-Allow-Origin': CORS_ORIGIN
                     },
                     'body': json.dumps({
                         'analysisId': analysis_id,
@@ -373,7 +376,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'statusCode': 200,
             'headers': {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+                'Access-Control-Allow-Origin': CORS_ORIGIN
             },
             'body': json.dumps({
                 'analysisId': analysis_id,
@@ -388,7 +391,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'statusCode': 500,
             'headers': {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+                'Access-Control-Allow-Origin': CORS_ORIGIN
             },
             'body': json.dumps({
                 'error': 'Internal server error',
@@ -401,7 +404,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'statusCode': 500,
             'headers': {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+                'Access-Control-Allow-Origin': CORS_ORIGIN
             },
             'body': json.dumps({
                 'error': 'Internal server error',

@@ -55,6 +55,7 @@ class ApiStack(Stack):
                 throttling_burst_limit=self.config.api_throttle_burst_limit,
                 tracing_enabled=self.config.enable_xray,
             ),
+            # CORS: restrict allow_origins to your domain for production use
             default_cors_preflight_options=apigw.CorsOptions(
                 allow_origins=apigw.Cors.ALL_ORIGINS,
                 allow_methods=apigw.Cors.ALL_METHODS,

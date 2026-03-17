@@ -27,6 +27,9 @@ ANALYSIS_TABLE_NAME = os.environ['ANALYSIS_TABLE_NAME']
 REPORTS_BUCKET_NAME = os.environ['REPORTS_BUCKET_NAME']
 PRESIGNED_URL_EXPIRY = int(os.environ.get('PRESIGNED_URL_EXPIRY', '3600'))  # 1 hour default
 
+# CORS origin — restrict to your domain for production use
+CORS_ORIGIN = os.environ.get('CORS_ORIGIN', '*')
+
 # Get DynamoDB table
 analysis_table = dynamodb.Table(ANALYSIS_TABLE_NAME)
 
@@ -343,7 +346,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'statusCode': 200,
                 'headers': {
                     'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
+                    'Access-Control-Allow-Origin': CORS_ORIGIN
                 },
                 'body': json.dumps(response_body)
             }
@@ -359,7 +362,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'statusCode': 400,
             'headers': {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+                'Access-Control-Allow-Origin': CORS_ORIGIN
             },
             'body': json.dumps({'error': error_msg})
         }
@@ -371,7 +374,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'statusCode': 500,
             'headers': {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+                'Access-Control-Allow-Origin': CORS_ORIGIN
             },
             'body': json.dumps({
                 'error': 'Internal server error',

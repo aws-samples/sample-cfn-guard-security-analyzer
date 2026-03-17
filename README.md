@@ -145,14 +145,20 @@ pip install -r service/requirements.txt  # FastAPI service (local dev)
 cdk deploy --all
 docker build --platform linux/amd64 -t cfn-security-analyzer .
 # Tag and push to your ECR repository
-aws s3 sync frontend/ s3://YOUR_FRONTEND_BUCKET/
+
+# Build and deploy frontend
+cd frontend && npm install && npm run build && cd ..
+aws s3 sync frontend/dist/ s3://YOUR_FRONTEND_BUCKET/
 ```
 
 ### Run Locally
 
 ```bash
+# Backend
 uvicorn service.main:app --host 0.0.0.0 --port 8000 --reload
-# Then open frontend/index.html in a browser
+
+# Frontend (in a separate terminal)
+cd frontend && npm install && npm run dev
 ```
 
 ## API Reference
