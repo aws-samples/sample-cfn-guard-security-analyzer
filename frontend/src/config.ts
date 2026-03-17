@@ -17,13 +17,13 @@ const USE_LEGACY = false;
 const LOCAL_API_URL = "http://localhost:8000";
 const LOCAL_WS_URL = "ws://localhost:8000/ws";
 
-const EKS_API_URL = "https://cfn-analyzer.gangprab.people.aws.dev";
-const EKS_WS_URL = "wss://cfn-analyzer.gangprab.people.aws.dev/ws";
+const EKS_API_URL = "https://your-alb-endpoint.example.com";
+const EKS_WS_URL = "wss://your-alb-endpoint.example.com/ws";
 
 const LEGACY_API_URL =
-  "https://6uyvwqy865.execute-api.us-east-1.amazonaws.com/dev";
+  "https://your-api-gateway-id.execute-api.us-east-1.amazonaws.com/dev";
 const LEGACY_WS_URL =
-  "wss://04hecd5eqj.execute-api.us-east-1.amazonaws.com/dev";
+  "wss://your-websocket-api-id.execute-api.us-east-1.amazonaws.com/dev";
 
 function resolveApiUrl(): string {
   if (isLocalhost) return LOCAL_API_URL;

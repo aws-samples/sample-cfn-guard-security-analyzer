@@ -8,6 +8,7 @@ Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7
 """
 
 import json
+import os
 import re
 import uuid
 from datetime import datetime, timedelta
@@ -28,8 +29,8 @@ from service.aws_clients import (
 
 router = APIRouter()
 
-# AgentCore agent IDs (ported from analysis_orchestrator.py)
-SECURITY_ANALYZER_AGENT_ID = "mRHhTSCZIG"
+# AgentCore agent ARN — set via environment variable after deploying your agent
+SECURITY_ANALYZER_AGENT_ARN = os.environ.get("SECURITY_ANALYZER_AGENT_ARN", "")
 
 
 # ---------------------------------------------------------------------------
@@ -93,10 +94,7 @@ def invoke_quick_scan_agent(analysis_id: str, resource_url: str) -> dict:
     }
 
     response = bedrock_agentcore_client.invoke_agent_runtime(
-        agentRuntimeArn=(
-            f"arn:aws:bedrock-agentcore:us-east-1:111111111111:"
-            f"runtime/cfn_security_analyzer-{SECURITY_ANALYZER_AGENT_ID}"
-        ),
+        agentRuntimeArn=SECURITY_ANALYZER_AGENT_ARN,
         runtimeSessionId=analysis_id,
         payload=json.dumps(input_payload).encode("utf-8"),
     )

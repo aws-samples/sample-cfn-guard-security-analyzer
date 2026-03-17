@@ -21,12 +21,8 @@ bedrock_agentcore = boto3.client('bedrock-agentcore')
 ANALYSIS_TABLE_NAME = os.environ['ANALYSIS_TABLE_NAME']
 STATE_MACHINE_ARN = os.environ.get('STATE_MACHINE_ARN')
 
-# AgentCore agent IDs (extracted from runtime ARNs)
-# Full ARN format: arn:aws:bedrock-agentcore:region:account:runtime/name-AGENTID
-# bedrock-agent-runtime API requires just the AGENTID part
-SECURITY_ANALYZER_AGENT_ID = 'mRHhTSCZIG'  # From cfn_security_analyzer-mRHhTSCZIG
-CRAWLER_AGENT_ID = '30OD06FRns'  # From cfn_crawler-30OD06FRns
-PROPERTY_ANALYZER_AGENT_ID = '1r49DI2B44'  # From cfn_property_analyzer-1r49DI2B44
+# AgentCore agent ARN — set via environment variable after deploying your agent
+SECURITY_ANALYZER_AGENT_ARN = os.environ.get('SECURITY_ANALYZER_AGENT_ARN', '')
 
 # Get DynamoDB table
 analysis_table = dynamodb.Table(ANALYSIS_TABLE_NAME)
@@ -126,7 +122,7 @@ def invoke_quick_scan_agent(analysis_id: str, resource_url: str) -> Dict[str, An
         # Invoke agent using bedrock-agentcore client
         # AgentCore uses runtime ARN format
         response = bedrock_agentcore.invoke_agent_runtime(
-            agentRuntimeArn=f"arn:aws:bedrock-agentcore:us-east-1:111111111111:runtime/cfn_security_analyzer-{SECURITY_ANALYZER_AGENT_ID}",
+            agentRuntimeArn=SECURITY_ANALYZER_AGENT_ARN,
             runtimeSessionId=analysis_id,
             payload=json.dumps(input_payload).encode('utf-8')
         )

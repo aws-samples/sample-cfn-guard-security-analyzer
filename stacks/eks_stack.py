@@ -26,6 +26,7 @@ class EksStack(Stack):
         connection_table,
         reports_bucket,
         state_machine,
+        admin_username: str = "",  # IAM username to grant cluster admin access (optional)
         **kwargs,
     ):
         super().__init__(scope, construct_id, **kwargs)
@@ -38,11 +39,12 @@ class EksStack(Stack):
         # 2. EKS Fargate cluster with Fargate profile
         self.cluster = self._create_eks_cluster()
 
-        # 2b. Grant current IAM user cluster admin access for kubectl
-        admin_user = iam.User.from_user_name(self, "AdminUser", "Prabhu")
-        self.cluster.aws_auth.add_user_mapping(
-            admin_user, groups=["system:masters"]
-        )
+        # 2b. Optionally grant an IAM user cluster admin access for kubectl
+        if admin_username:
+            admin_user = iam.User.from_user_name(self, "AdminUser", admin_username)
+            self.cluster.aws_auth.add_user_mapping(
+                admin_user, groups=["system:masters"]
+            )
 
         # 3. Create namespace first — everything else depends on it
         self.app_namespace = self.cluster.add_manifest(
@@ -245,7 +247,7 @@ class EksStack(Stack):
         namespace = "cfn-security"
         image_uri = self.ecr_repository.repository_uri_for_tag("latest")
         # Force rolling update on each deploy
-        deploy_hash = hashlib.md5(str(time.time()).encode()).hexdigest()[:8]
+        deploy_hash = hashlib.sha256(str(time.time()).encode()).hexdigest()[:8]
 
         # --- Deployment ---
         deployment_manifest = {

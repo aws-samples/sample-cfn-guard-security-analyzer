@@ -3,15 +3,18 @@
 Creates the FastAPI app, configures CORS middleware, and registers routers.
 """
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="CloudFormation Security Analyzer")
 
 # CORS middleware — Requirement 10.1
+# Configure via CORS_ORIGINS env var (comma-separated). Default "*" for local dev.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
     allow_methods=["*"],
     allow_headers=[
         "Content-Type",
