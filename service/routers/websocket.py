@@ -8,7 +8,7 @@ Requirements: 3.1, 3.2, 3.3, 3.4
 """
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -24,11 +24,11 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     connection_id = str(uuid.uuid4())
 
     # Store connection in DynamoDB with 2-hour TTL (Requirement 3.1)
-    ttl = int((datetime.utcnow() + timedelta(hours=2)).timestamp())
+    ttl = int((datetime.now(timezone.utc) + timedelta(hours=2)).timestamp())
     connection_table.put_item(
         Item={
             "connectionId": connection_id,
-            "connectedAt": datetime.utcnow().isoformat(),
+            "connectedAt": datetime.now(timezone.utc).isoformat(),
             "ttl": ttl,
         }
     )

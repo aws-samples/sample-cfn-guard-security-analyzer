@@ -2,6 +2,7 @@
 from aws_cdk import (
     Stack,
     Duration,
+    RemovalPolicy,
     aws_stepfunctions as sfn,
     aws_stepfunctions_tasks as tasks,
     aws_lambda as lambda_,
@@ -82,10 +83,7 @@ class StepFunctionsStack(Stack):
                 actions=[
                     "bedrock-agentcore:InvokeAgentRuntime",
                 ],
-                resources=[
-                    agent_arn,
-                    f"{agent_arn}/*",
-                ],
+                resources=[agent_arn, f"{agent_arn}/*"] if agent_arn else ["*"],
             )
         )
         
@@ -299,6 +297,7 @@ def handler(event, context):
             "CrawlDocumentation",
             lambda_function=self.crawler_invoker,
             payload=sfn.TaskInput.from_object({
+                # Validate: crawler_agent_arn must be set at deploy time for this task to succeed
                 "agentArn": self.crawler_agent_arn,  # Provide your deployed crawler agent ARN
                 "sessionId.$": "$.analysisId",
                 "inputText.$": "States.Format('Extract all security-relevant properties from the CloudFormation resource documentation at: {}', $.resourceUrl)"
@@ -355,6 +354,7 @@ def handler(event, context):
             "AnalyzeSingleProperty",
             lambda_function=self.property_analyzer_invoker,
             payload=sfn.TaskInput.from_object({
+                # Validate: property_analyzer_agent_arn must be set at deploy time for this task to succeed
                 "agentArn": self.property_analyzer_agent_arn,  # Provide your deployed property analyzer agent ARN
                 "sessionId.$": "States.Format('{}-{}', $.analysisId, $.property.name)",
                 "inputText.$": "States.Format('Perform detailed security analysis of the CloudFormation property \"{}\" from resource at: {}. Property description: {}', $.property.name, $.resourceUrl, $.property.description)",
@@ -588,6 +588,7 @@ def handler(event, context):
             "StateMachineLogGroup",
             log_group_name=f"/aws/vendedlogs/states/cfn-security-workflow-{self.config.environment_name}",
             retention=logs.RetentionDays.ONE_WEEK if self.config.environment_name == "dev" else logs.RetentionDays.ONE_MONTH,
+            removal_policy=RemovalPolicy.DESTROY if self.config.environment_name != "prod" else RemovalPolicy.RETAIN,
         )
 
         # Create IAM role for state machine

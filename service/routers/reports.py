@@ -7,7 +7,7 @@ upload it to S3, and return a pre-signed download URL.
 Requirements: 2.1, 2.2, 2.3, 2.4
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 from typing import Optional
 
@@ -124,7 +124,7 @@ def generate_pdf_report(analysis_data: dict) -> BytesIO:
         ["Analysis ID:", analysis_data["analysisId"]],
         ["Resource URL:", analysis_data["resourceUrl"]],
         ["Analysis Type:", analysis_data["analysisType"].capitalize()],
-        ["Generated:", datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")],
+        ["Generated:", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")],
         ["Status:", analysis_data["status"]],
     ]
     metadata_table = Table(metadata, colWidths=[2 * inch, 4.5 * inch])
@@ -252,7 +252,7 @@ def generate_pdf_report(analysis_data: dict) -> BytesIO:
 
 def upload_to_s3(pdf_buffer: BytesIO, analysis_id: str) -> str:
     """Upload PDF report to S3 and return the object key."""
-    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     object_key = f"reports/{analysis_id}/{timestamp}.pdf"
 
     s3_client.put_object(
@@ -262,7 +262,7 @@ def upload_to_s3(pdf_buffer: BytesIO, analysis_id: str) -> str:
         ContentType="application/pdf",
         Metadata={
             "analysisId": analysis_id,
-            "generatedAt": datetime.utcnow().isoformat(),
+            "generatedAt": datetime.now(timezone.utc).isoformat(),
         },
     )
     return object_key
@@ -287,7 +287,7 @@ def update_analysis_with_report(
         ExpressionAttributeValues={
             ":url": report_url,
             ":key": s3_key,
-            ":ts": datetime.utcnow().isoformat(),
+            ":ts": datetime.now(timezone.utc).isoformat(),
         },
     )
 

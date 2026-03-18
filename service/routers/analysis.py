@@ -11,7 +11,7 @@ import json
 import os
 import re
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Optional
 
@@ -67,7 +67,7 @@ def create_analysis_record(
     connection_id: Optional[str] = None,
 ) -> dict:
     """Create initial analysis record in DynamoDB."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     ttl = int((now + timedelta(days=30)).timestamp())
 
     record: dict = {
@@ -89,6 +89,12 @@ def create_analysis_record(
 
 def invoke_quick_scan_agent(analysis_id: str, resource_url: str) -> dict:
     """Invoke AgentCore quick scan agent for fast analysis."""
+    if not SECURITY_ANALYZER_AGENT_ARN:
+        raise ValueError(
+            "SECURITY_ANALYZER_AGENT_ARN environment variable not set. "
+            "Deploy your Bedrock AgentCore agent first and set this variable."
+        )
+
     input_payload = {
         "prompt": f"Perform a quick security scan of the CloudFormation resource at: {resource_url}"
     }
@@ -115,7 +121,7 @@ def invoke_quick_scan_agent(analysis_id: str, resource_url: str) -> dict:
             "resourceType": "Unknown",
             "properties": [],
             "rawResponse": result_text,
-            "analysisTimestamp": datetime.utcnow().isoformat(),
+            "analysisTimestamp": datetime.now(timezone.utc).isoformat(),
         }
 
 
@@ -127,7 +133,7 @@ def start_step_functions_workflow(analysis_id: str, resource_url: str) -> dict:
     workflow_input = {
         "analysisId": analysis_id,
         "resourceUrl": resource_url,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     return stepfunctions_client.start_execution(
@@ -143,7 +149,7 @@ def update_analysis_status(analysis_id: str, status: str, **kwargs: object) -> N
     expr_attr_names: dict[str, str] = {"#status": "status"}
     expr_attr_values: dict[str, object] = {
         ":status": status,
-        ":updated": datetime.utcnow().isoformat(),
+        ":updated": datetime.now(timezone.utc).isoformat(),
     }
 
     reserved_keywords = {"error", "data", "timestamp", "name", "type", "value"}

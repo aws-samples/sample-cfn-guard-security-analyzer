@@ -4,7 +4,7 @@ This agent performs quick security scans of CloudFormation resources,
 identifying the top 5-10 most critical security properties.
 """
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from bedrock_agentcore import BedrockAgentCoreApp
 from strands import Agent
 from strands_tools import http_request
@@ -86,7 +86,7 @@ Focus on the most critical security properties only. Be concise and actionable."
     return {
         'statusCode': 200,
         'resourceUrl': resource_url,
-        'analysisTimestamp': datetime.utcnow().isoformat(),
+        'analysisTimestamp': datetime.now(timezone.utc).isoformat(),
         'result': str(response)
     }
 

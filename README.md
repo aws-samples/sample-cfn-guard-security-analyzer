@@ -2,83 +2,98 @@
 
 > **Important:** This is sample code for demonstration and educational purposes only. It is not intended for production use without further review and hardening. You should work with your security and legal teams to meet your organizational security, regulatory, and compliance requirements before deployment.
 
-An AI-powered tool that automatically analyzes AWS CloudFormation resource configurations for security vulnerabilities. Point it at any CloudFormation resource documentation URL and it identifies security-critical properties, assesses risk levels, and provides actionable remediation recommendations — powered by Amazon Bedrock AgentCore and Claude.
+**Automatically find security misconfigurations in your CloudFormation templates before they reach production.**
 
-## Why This Exists
+Every CloudFormation resource has dozens of properties — encryption settings, public access controls, logging configurations, IAM permissions. Reviewing each one manually is slow, error-prone, and doesn't scale. This tool uses AI agents to do it in seconds.
 
-CloudFormation templates define your AWS infrastructure, but misconfigured resources are one of the leading causes of cloud security incidents. Manually reviewing every property of every resource for security implications is tedious and error-prone. This tool automates that process using AI agents that understand AWS security best practices.
-
-**Example:** Give it the S3 Bucket documentation URL and it will identify that `BucketEncryption` is CRITICAL (data at rest), `PublicAccessBlockConfiguration` is CRITICAL (public exposure), `VersioningConfiguration` is HIGH (data protection), and so on — with specific recommendations for each.
+Give it any CloudFormation resource documentation URL. It returns a prioritized list of security-critical properties with risk levels, threat descriptions, and specific remediation recommendations.
 
 ## How It Works
 
+![Architecture Diagram](docs/architecture.png)
+
+The system supports two analysis modes:
+
 ### Quick Scan (10-15 seconds)
 
-A single AI agent performs a fast security sweep, identifying the top 5-10 most critical security properties. Results stream back in real-time via Server-Sent Events (SSE), with each property card appearing as it is analyzed.
+A single **Security Analyzer Agent** performs a fast sweep, identifying the top 5-10 most critical security properties. Results stream back in real-time via Server-Sent Events (SSE) — each property card appears as it's analyzed.
 
 ```
-User -> Frontend -> POST /analysis/stream (SSE) -> FastAPI -> Bedrock AgentCore
-                                                                  |
-                                                        Security Analyzer Agent
-                                                           (Claude 3.5 Sonnet)
-                                                                  |
-                                                  <- SSE: property events stream back <-
+Developer → Frontend → FastAPI (SSE) → Bedrock AgentCore → Claude 3.5 Sonnet
+                                                              ↓
+                                              ← Property-by-property streaming ←
 ```
 
 ### Detailed Analysis (2-5 minutes)
 
-A multi-step workflow orchestrated by AWS Step Functions:
+A multi-agent workflow orchestrated by **AWS Step Functions**:
 
 1. **Crawler Agent** extracts all security-relevant properties from the CloudFormation documentation
-2. **Property Analyzer Agent** performs deep-dive analysis on each property in parallel (up to 8 concurrent)
-3. Progress updates stream to the frontend via WebSocket in real-time
-4. Results are aggregated and a PDF report can be generated
+2. **Property Analyzer Agents** perform deep-dive analysis on each property **in parallel** (up to 8 concurrent)
+3. Progress updates stream to the frontend via **WebSocket** in real-time
+4. Results are aggregated and a **PDF report** is generated
+
+### The Agentic AI Pattern
+
+This project demonstrates a production-ready **multi-agent architecture** on Amazon Bedrock AgentCore:
+
+- **3 specialized agents** built with the [Strands Agents SDK](https://github.com/strands-agents/strands-agents-sdk-python), each with a focused role
+- **Fan-out / fan-in** pattern via Step Functions Map state for parallel agent invocation
+- **Real-time streaming** — SSE for stateless quick scans, WebSocket for stateful long-running workflows
+- **Agent-to-service communication** — Lambda invokers bridge Step Functions with AgentCore runtime API
 
 ## Architecture
 
-### AWS Services Used
-
 | Service | Purpose |
 |---------|---------|
-| **EKS Fargate** | Hosts the FastAPI backend service |
-| **Bedrock AgentCore** | Runs the three AI agents (Strands SDK) |
-| **DynamoDB** | Stores analysis state and WebSocket connections |
-| **Step Functions** | Orchestrates the detailed analysis workflow |
-| **S3** | Hosts the frontend SPA and stores PDF reports |
-| **CloudFront** | CDN for the frontend |
-| **CloudWatch** | Dashboards, alarms, and monitoring |
-| **ECR** | Container registry for the service image |
+| **Amazon Bedrock AgentCore** | Hosts the 3 AI agents (Strands SDK + Claude 3.5 Sonnet) |
+| **Amazon EKS Fargate** | Runs the FastAPI backend service |
+| **AWS Step Functions** | Orchestrates the detailed multi-agent analysis workflow |
+| **AWS Lambda** | Invokes AgentCore agents from Step Functions |
+| **Amazon DynamoDB** | Stores analysis state and WebSocket connections |
+| **Amazon S3** | Hosts the React frontend SPA and stores PDF reports |
+| **Amazon CloudFront** | CDN for the frontend |
+| **Amazon CloudWatch** | Dashboards, alarms, and monitoring |
 
-### AI Agents
+## Example Output
 
-All three agents are built with the [Strands Agents SDK](https://github.com/strands-agents/strands-agents-sdk-python) and deployed to Amazon Bedrock AgentCore:
+```
+Resource: AWS::S3::Bucket
 
-| Agent | Role | Used In |
-|-------|------|---------|
-| **Security Analyzer** | Quick top-5-10 security property scan | Quick Scan |
-| **Crawler** | Extracts all security-relevant properties from CloudFormation docs | Detailed Analysis (Step 1) |
-| **Property Analyzer** | Deep-dive analysis of individual properties | Detailed Analysis (Step 2, parallel) |
+  CRITICAL  BucketEncryption
+            Threat: Data at rest exposed without encryption
+            Fix: Enable SSE-S3 or SSE-KMS encryption
+
+  CRITICAL  PublicAccessBlockConfiguration
+            Threat: Bucket contents publicly accessible
+            Fix: Set BlockPublicAcls, BlockPublicPolicy, IgnorePublicAcls, RestrictPublicBuckets to true
+
+  HIGH      VersioningConfiguration
+            Threat: No protection against accidental deletion or ransomware
+            Fix: Enable versioning with MFA delete
+
+  HIGH      LoggingConfiguration
+            Threat: No audit trail for bucket access
+            Fix: Enable server access logging to a separate bucket
+```
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Infrastructure as Code | AWS CDK v2 (Python) |
-| Backend API | FastAPI + Uvicorn |
-| Container Runtime | EKS Fargate |
-| AI/ML | Bedrock AgentCore, Strands Agents SDK, Claude 3.5 Sonnet |
+| Infrastructure | AWS CDK v2 (Python) with cdk-nag security checks |
+| Backend | FastAPI + Uvicorn on EKS Fargate |
+| AI/ML | Amazon Bedrock AgentCore, Strands Agents SDK, Claude 3.5 Sonnet |
 | Workflow | AWS Step Functions + Lambda |
 | Database | Amazon DynamoDB |
-| Frontend | React, TypeScript, Vite |
-| PDF Generation | ReportLab |
-| Testing | pytest, Hypothesis (property-based testing), moto |
-| Language | Python 3.11 throughout |
+| Frontend | React, TypeScript, Vite, Cloudscape Design System |
+| Testing | pytest, Hypothesis (property-based testing), Vitest |
 
 ## Project Structure
 
 ```
 .
-├── app.py                          # CDK entry point
+├── app.py                          # CDK entry point (with cdk-nag)
 ├── config.py                       # Per-environment config (dev/staging/prod)
 ├── Dockerfile                      # Multi-stage build for FastAPI service
 ├── stacks/                         # CDK stack definitions
@@ -103,13 +118,14 @@ All three agents are built with the [Strands Agents SDK](https://github.com/stra
 │   └── property_analyzer_agent.py  #   Detailed property analysis agent
 ├── lambda/                         # Lambda functions (used by Step Functions)
 ├── frontend/                       # React + TypeScript SPA (Vite)
+│   ├── package.json                #   Dependencies (React, Cloudscape, Vite)
 │   └── src/
 │       ├── App.tsx                  #   Root component
 │       ├── config.ts               #   API endpoint configuration
-│       ├── components/             #   UI components (InputSection, ResultsSection, etc.)
-│       ├── hooks/                  #   Custom hooks (useSSE, useWebSocket, useAnalysis)
+│       ├── components/             #   UI components
+│       ├── hooks/                  #   Custom hooks (useSSE, useWebSocket)
 │       └── utils/                  #   Utility functions
-└── tests/unit/                     # pytest + Hypothesis property-based tests
+└── tests/                          # pytest + Hypothesis + Vitest
 ```
 
 ## Getting Started
@@ -117,19 +133,24 @@ All three agents are built with the [Strands Agents SDK](https://github.com/stra
 ### Prerequisites
 
 - Python 3.11+
+- Node.js 18+ and npm
 - AWS CDK v2 (`npm install -g aws-cdk`)
 - AWS CLI configured with credentials
-- Docker
+- Docker (for building the service container)
 - kubectl (for EKS operations)
 
 ### Install Dependencies
 
 ```bash
+# CDK and backend
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt          # CDK infrastructure
-pip install -r requirements-dev.txt      # Testing (pytest, hypothesis, moto)
-pip install -r service/requirements.txt  # FastAPI service (local dev)
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+pip install -r service/requirements.txt
+
+# Frontend
+cd frontend && npm install && cd ..
 ```
 
 ### Configure
@@ -142,12 +163,15 @@ pip install -r service/requirements.txt  # FastAPI service (local dev)
 ### Deploy
 
 ```bash
+# Deploy all CDK stacks
 cdk deploy --all
+
+# Build and push the service container
 docker build --platform linux/amd64 -t cfn-security-analyzer .
 # Tag and push to your ECR repository
 
 # Build and deploy frontend
-cd frontend && npm install && npm run build && cd ..
+cd frontend && npm run build && cd ..
 aws s3 sync frontend/dist/ s3://YOUR_FRONTEND_BUCKET/
 ```
 
@@ -157,8 +181,8 @@ aws s3 sync frontend/dist/ s3://YOUR_FRONTEND_BUCKET/
 # Backend
 uvicorn service.main:app --host 0.0.0.0 --port 8000 --reload
 
-# Frontend (in a separate terminal)
-cd frontend && npm install && npm run dev
+# Frontend (separate terminal)
+cd frontend && npm run dev
 ```
 
 ## API Reference
@@ -169,7 +193,7 @@ cd frontend && npm install && npm run dev
 | `POST` | `/analysis/stream` | Quick scan with SSE streaming |
 | `GET` | `/analysis/{id}` | Get analysis status and results |
 | `POST` | `/reports/{id}` | Generate PDF security report |
-| `WS` | `/ws` | WebSocket for real-time progress updates |
+| `WS` | `/ws` | WebSocket for real-time progress |
 | `POST` | `/callbacks/progress` | Step Functions progress callback |
 | `GET` | `/health` | Health check |
 
@@ -181,29 +205,19 @@ curl -X POST http://localhost:8000/analysis/stream \
   -d '{"resourceUrl": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-s3-bucket.html"}'
 ```
 
-Response (SSE stream):
-```
-event: status
-data: {"phase": "started", "analysisId": "abc-123"}
-
-event: property
-data: {"index": 0, "total": 5, "name": "BucketEncryption", "riskLevel": "CRITICAL", ...}
-
-event: complete
-data: {"analysisId": "abc-123", "totalProperties": 5}
-```
-
 ## Testing
 
 ```bash
+# Backend tests
 pytest tests/unit/ -v
-```
 
-Property-based tests use [Hypothesis](https://hypothesis.readthedocs.io/) to validate SSE event sequences, endpoint headers, error handling, progress calculations, and timer formatting across hundreds of generated inputs.
+# Frontend tests
+cd frontend && npm test
+```
 
 ## Multi-Environment Support
 
-Three environments in `config.py`: `dev`, `staging`, `prod`. Controlled via `CDK_ENVIRONMENT` env var.
+Three environments in `config.py`: `dev`, `staging`, `prod`.
 
 ```bash
 CDK_ENVIRONMENT=staging cdk deploy --all

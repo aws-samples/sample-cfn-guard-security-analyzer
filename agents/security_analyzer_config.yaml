@@ -1,8 +1,8 @@
 name: cfn-security-analyzer
 description: Quick security scanner for CloudFormation resources
 runtime: python3.11
-entrypoint: security_analyzer_agent:handler
-model: anthropic.claude-3-5-sonnet-20241022-v2:0
+entrypoint: security_analyzer_agent:invoke
+model: us.anthropic.claude-3-5-sonnet-20241022-v2:0
 
 # Environment configuration
 environment:

@@ -6,6 +6,7 @@ import aws_cdk as cdk
 from cdk_nag import AwsSolutionsChecks
 
 from config import get_environment_config
+from cdk_nag_suppressions import apply_suppressions
 
 
 # Get environment from environment variable or default to dev
@@ -72,7 +73,8 @@ monitoring_stack = MonitoringStack(
 for key, value in config.tags.items():
     cdk.Tags.of(app).add(key, value)
 
-# cdk_nag: AWS Solutions security checks
+# cdk_nag: AWS Solutions security checks with documented suppressions
 cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
+apply_suppressions(app)
 
 app.synth()

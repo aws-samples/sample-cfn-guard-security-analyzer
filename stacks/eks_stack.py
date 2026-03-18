@@ -123,6 +123,28 @@ class EksStack(Stack):
             selectors=[eks.Selector(namespace="kube-system")],
         )
 
+        # Patch CoreDNS for Fargate — required for DNS resolution
+        coredns_patch = cluster.add_manifest(
+            "CoreDnsFargatePatch",
+            {
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "metadata": {
+                    "name": "coredns",
+                    "namespace": "kube-system",
+                },
+                "spec": {
+                    "template": {
+                        "metadata": {
+                            "annotations": {
+                                "eks.amazonaws.com/compute-type": "fargate",
+                            }
+                        }
+                    }
+                },
+            },
+        )
+
         return cluster
 
     def _create_service_account(
