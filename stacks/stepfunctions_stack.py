@@ -407,7 +407,7 @@ def handler(event, context):
             self,
             "AnalyzePropertiesMap",
             items_path="$.crawlResult.Payload.result.properties",
-            parameters={
+            item_selector={
                 "property.$": "$$.Map.Item.Value",
                 "index.$": "$$.Map.Item.Index",
                 "analysisId.$": "$.analysisId",
@@ -417,7 +417,7 @@ def handler(event, context):
             max_concurrency=self.config.max_concurrent_properties,
             result_path="$.analysisResults",
         )
-        analyze_properties_map.iterator(map_iterator_chain)
+        analyze_properties_map.item_processor(map_iterator_chain)
 
         # 3b. Notify progress after property analysis
         notify_analysis_complete = tasks.LambdaInvoke(

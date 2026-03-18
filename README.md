@@ -156,24 +156,73 @@ cd frontend && npm install && cd ..
 ### Configure
 
 1. Set your AWS account ID in `config.py` (replace `111111111111`)
-2. Deploy the three Bedrock AgentCore agents from `agents/` and note their runtime ARNs
-3. Set agent ARNs as environment variables or update them in `stacks/stepfunctions_stack.py` and `service/routers/analysis.py`
-4. After deploying infrastructure, update `frontend/src/config.ts` with your API endpoints
+2. Copy `.env.example` to `.env` and update values as you deploy each component
+3. After deploying infrastructure, update `frontend/src/config.ts` with your API endpoints
 
-### Deploy
+### Deploy Bedrock AgentCore Agents
+
+The three AI agents must be deployed to Amazon Bedrock AgentCore before the backend can invoke them. Each agent is in the `agents/` directory with its Python code and YAML config.
+
+```bash
+# Install the Bedrock AgentCore CLI
+pip install bedrock-agentcore
+
+# Deploy each agent (from the project root)
+cd agents
+
+# 1. Security Analyzer Agent (used by quick scan)
+bedrock-agentcore deploy --config security_analyzer_config.yaml
+
+# 2. Crawler Agent (used by detailed analysis step 1)
+bedrock-agentcore deploy --config crawler_config.yaml
+
+# 3. Property Analyzer Agent (used by detailed analysis step 2)
+bedrock-agentcore deploy --config property_analyzer_config.yaml
+```
+
+After each deployment, note the **Agent Runtime ARN** from the output. You'll need these:
+
+```bash
+# Set in your environment (or .env file)
+export SECURITY_ANALYZER_AGENT_ARN=arn:aws:bedrock-agentcore:us-east-1:<account>:runtime/<agent-id>
+
+# Also pass to CDK for Step Functions stack
+# In app.py, update the StepFunctionsStack parameters:
+#   crawler_agent_arn="arn:aws:bedrock-agentcore:..."
+#   property_analyzer_agent_arn="arn:aws:bedrock-agentcore:..."
+```
+
+### Deploy Infrastructure
 
 ```bash
 # Deploy all CDK stacks
 cdk deploy --all
 
+# After EKS deploys, configure kubectl access
+aws eks update-kubeconfig --name cfn-security-v2-dev --region us-east-1
+
+# Patch CoreDNS for Fargate (if not already patched by CDK)
+kubectl patch deployment coredns -n kube-system --type=merge \
+  -p '{"spec":{"template":{"metadata":{"annotations":{"eks.amazonaws.com/compute-type":"fargate"}}}}}'
+
 # Build and push the service container
-docker build --platform linux/amd64 -t cfn-security-analyzer .
-# Tag and push to your ECR repository
+ECR_URI=$(aws cloudformation describe-stacks \
+  --stack-name CfnSecurityAnalyzer-Eks-v2-dev \
+  --query "Stacks[0].Outputs[?ExportName=='cfn-security-ecr-uri-v2-dev'].OutputValue" \
+  --output text)
+docker build --platform linux/amd64 -t $ECR_URI:latest .
+aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_URI
+docker push $ECR_URI:latest
+
+# Apply the Kubernetes ingress for ALB
+kubectl apply -f k8s/ingress.yaml
 
 # Build and deploy frontend
 cd frontend && npm run build && cd ..
 aws s3 sync frontend/dist/ s3://YOUR_FRONTEND_BUCKET/
 ```
+
+> **EKS Access:** To grant kubectl access to additional IAM users, pass `admin_username="YourIAMUsername"` to the `EksStack` in `app.py`, or manually add an EKS access entry via the AWS Console.
 
 ### Run Locally
 

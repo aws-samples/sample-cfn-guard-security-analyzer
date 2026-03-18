@@ -107,16 +107,6 @@ class StorageStack(Stack):
         Returns:
             CloudFront Distribution construct
         """
-        # Create Origin Access Identity for S3
-        oai = cloudfront.OriginAccessIdentity(
-            self,
-            "FrontendOAI",
-            comment=f"OAI for CFN Security Analyzer frontend - {self.config.environment_name}",
-        )
-        
-        # Grant CloudFront read access to frontend bucket
-        self.frontend_bucket.grant_read(oai)
-        
         # Create custom cache policy for frontend assets
         # This allows shorter TTLs and respects cache-control headers
         cache_policy = cloudfront.CachePolicy(
@@ -139,9 +129,8 @@ class StorageStack(Stack):
             self,
             "FrontendDistribution",
             default_behavior=cloudfront.BehaviorOptions(
-                origin=origins.S3Origin(
+                origin=origins.S3BucketOrigin(
                     self.frontend_bucket,
-                    origin_access_identity=oai,
                 ),
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                 allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
