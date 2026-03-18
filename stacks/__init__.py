@@ -1,1 +1,1 @@
-"""CDK Stack modules for CloudFormation Security Analyzer serverless architecture."""
+"""CDK Stack modules for CloudFormation Security Analyzer."""

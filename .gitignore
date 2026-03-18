@@ -15,7 +15,6 @@ cdk.context.json
 
 # Node
 node_modules/
-package-lock.json
 
 # Test caches
 .pytest_cache/

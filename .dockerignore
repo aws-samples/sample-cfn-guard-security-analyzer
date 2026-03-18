@@ -5,3 +5,10 @@ tests
 __pycache__
 *.pyc
 .kiro
+frontend
+agents
+stacks
+docs
+k8s
+node_modules
+*.md
