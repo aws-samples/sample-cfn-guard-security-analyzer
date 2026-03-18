@@ -161,35 +161,22 @@ cd frontend && npm install && cd ..
 
 ### Deploy Bedrock AgentCore Agents
 
-The three AI agents must be deployed to Amazon Bedrock AgentCore before the backend can invoke them. Each agent is in the `agents/` directory with its Python code and YAML config.
+The three AI agents are deployed to Amazon Bedrock AgentCore via CDK as part of `cdk deploy --all`. The `AgentsStack` automatically:
+
+1. Packages agent Python code from `agents/` into S3
+2. Creates three AgentCore Runtime resources (Security Analyzer, Crawler, Property Analyzer)
+3. Wires the agent runtime ARNs to the Step Functions stack
+
+The agent code is in `agents/`:
+- `security_analyzer_agent.py` — quick scan (single agent, SSE)
+- `crawler_agent.py` — extracts properties from CloudFormation docs
+- `property_analyzer_agent.py` — deep-dive analysis per property
+
+After deployment, set the Security Analyzer agent ARN for the FastAPI backend:
 
 ```bash
-# Install the Bedrock AgentCore CLI
-pip install bedrock-agentcore
-
-# Deploy each agent (from the project root)
-cd agents
-
-# 1. Security Analyzer Agent (used by quick scan)
-bedrock-agentcore deploy --config security_analyzer_config.yaml
-
-# 2. Crawler Agent (used by detailed analysis step 1)
-bedrock-agentcore deploy --config crawler_config.yaml
-
-# 3. Property Analyzer Agent (used by detailed analysis step 2)
-bedrock-agentcore deploy --config property_analyzer_config.yaml
-```
-
-After each deployment, note the **Agent Runtime ARN** from the output. You'll need these:
-
-```bash
-# Set in your environment (or .env file)
+# Get the agent ARN from CDK outputs
 export SECURITY_ANALYZER_AGENT_ARN=arn:aws:bedrock-agentcore:us-east-1:<account>:runtime/<agent-id>
-
-# Also pass to CDK for Step Functions stack
-# In app.py, update the StepFunctionsStack parameters:
-#   crawler_agent_arn="arn:aws:bedrock-agentcore:..."
-#   property_analyzer_agent_arn="arn:aws:bedrock-agentcore:..."
 ```
 
 ### Deploy Infrastructure

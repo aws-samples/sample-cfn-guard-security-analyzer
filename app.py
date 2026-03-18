@@ -18,6 +18,7 @@ app = cdk.App()
 # Import stacks
 from stacks.database_stack import DatabaseStack
 from stacks.storage_stack import StorageStack
+from stacks.agents_stack import AgentsStack
 from stacks.stepfunctions_stack import StepFunctionsStack
 from stacks.eks_stack import EksStack
 from stacks.monitoring_stack import MonitoringStack
@@ -38,17 +39,27 @@ storage_stack = StorageStack(
     env=cdk.Environment(account=config.account, region=config.region)
 )
 
-# Create Step Functions stack
+# Create Bedrock AgentCore agents
+agents_stack = AgentsStack(
+    app,
+    f"CfnSecurityAnalyzer-Agents-{config.environment_name}",
+    config=config,
+    env=cdk.Environment(account=config.account, region=config.region)
+)
+
+# Create Step Functions stack (uses agent ARNs from agents stack)
 stepfunctions_stack = StepFunctionsStack(
     app,
     f"CfnSecurityAnalyzer-StepFunctions-{config.environment_name}",
     config=config,
     analysis_table=database_stack.analysis_table,
+    crawler_agent_arn=agents_stack.crawler.agent_runtime_arn,
+    property_analyzer_agent_arn=agents_stack.property_analyzer.agent_runtime_arn,
     alb_endpoint_url="",  # Set to your ALB endpoint URL after deployment
     env=cdk.Environment(account=config.account, region=config.region)
 )
 
-# Create EKS Fargate stack (replaces LambdaStack and ApiStack)
+# Create EKS Fargate stack
 eks_stack = EksStack(
     app,
     f"CfnSecurityAnalyzer-Eks-v2-{config.environment_name}",
@@ -60,7 +71,7 @@ eks_stack = EksStack(
     env=cdk.Environment(account=config.account, region=config.region),
 )
 
-# Create Monitoring stack (Lambda and API Gateway references removed)
+# Create Monitoring stack
 monitoring_stack = MonitoringStack(
     app,
     f"CfnSecurityAnalyzer-Monitoring-{config.environment_name}",
