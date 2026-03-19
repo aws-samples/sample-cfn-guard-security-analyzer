@@ -1,12 +1,19 @@
 """Environment configuration for CDK stacks."""
+import os
 from dataclasses import dataclass
 from typing import Optional
+
+# Account and region can be set via environment variables or overridden per environment below.
+# Note: CDK overwrites CDK_DEFAULT_REGION before running the app, so we read
+# AWS_DEFAULT_REGION first (which CDK does not modify).
+_DEFAULT_ACCOUNT = os.environ.get("CDK_DEFAULT_ACCOUNT", "111111111111")
+_DEFAULT_REGION = os.environ.get("AWS_DEFAULT_REGION") or os.environ.get("CDK_DEFAULT_REGION", "us-east-1")
 
 
 @dataclass
 class EnvironmentConfig:
     """Configuration for a deployment environment."""
-    
+
     environment_name: str
     account: str
     region: str
@@ -26,7 +33,7 @@ class EnvironmentConfig:
     api_throttle_burst_limit: int = 200
     
     # Step Functions configuration
-    max_concurrent_properties: int = 8
+    max_concurrent_properties: int = 2  # AgentCore runtime limits concurrent sessions per agent
     max_concurrent_resources: int = 5
     
     # S3 configuration
@@ -57,24 +64,24 @@ class EnvironmentConfig:
 ENVIRONMENTS = {
     "dev": EnvironmentConfig(
         environment_name="dev",
-        account="111111111111",  # Replace with your AWS account ID
-        region="us-east-1",
+        account=_DEFAULT_ACCOUNT,
+        region=_DEFAULT_REGION,
         lambda_log_retention_days=7,  # Changed from 3 to 7 (valid enum value)
         create_alarms=False,
         enable_xray=False,
     ),
     "staging": EnvironmentConfig(
         environment_name="staging",
-        account="111111111111",  # Replace with your AWS account ID
-        region="us-east-1",
+        account=_DEFAULT_ACCOUNT,
+        region=_DEFAULT_REGION,
         lambda_log_retention_days=7,
         create_alarms=True,
         enable_xray=True,
     ),
     "prod": EnvironmentConfig(
         environment_name="prod",
-        account="111111111111",  # Replace with your AWS account ID
-        region="us-east-1",
+        account=_DEFAULT_ACCOUNT,
+        region=_DEFAULT_REGION,
         lambda_memory_mb=1024,
         lambda_log_retention_days=30,
         create_alarms=True,

@@ -1,35 +1,41 @@
 """Bedrock AgentCore agents stack for CloudFormation Security Analyzer.
 
-Deploys three AI agents to Amazon Bedrock AgentCore Runtime:
-1. Security Analyzer Agent — quick scan (single agent, SSE)
-2. Crawler Agent — extracts properties from CloudFormation docs
-3. Property Analyzer Agent — deep-dive analysis per property
+Uploads agent code to S3 for reference and outputs agent runtime ARNs.
+Agents are deployed via the agentcore CLI (scripts/deploy-agents.sh).
+
+The AgentCore CDK alpha construct is experimental and has limitations
+(e.g. requires zip-packaged code). Until it stabilizes, the CLI-based
+deployment is the recommended approach.
 """
 
 import os
+from dataclasses import dataclass
+
 from aws_cdk import (
     Stack,
+    CfnOutput,
     RemovalPolicy,
     aws_s3 as s3,
     aws_s3_deployment as s3deploy,
-    aws_iam as iam,
 )
 from constructs import Construct
 from config import EnvironmentConfig
 
-try:
-    import aws_cdk.aws_bedrock_agentcore_alpha as agentcore
-    HAS_AGENTCORE_CDK = True
-except ImportError:
-    HAS_AGENTCORE_CDK = False
+
+@dataclass
+class AgentRef:
+    """Reference to an AgentCore agent runtime, resolved from env vars."""
+    agent_runtime_arn: str = ""
 
 
 class AgentsStack(Stack):
-    """Stack containing Bedrock AgentCore agent runtimes.
+    """Stack that packages agent code to S3 and references deployed agent ARNs.
 
-    Packages agent Python code into S3 and creates AgentCore Runtime
-    resources for each agent. Exports agent runtime ARNs for use by
-    other stacks (StepFunctions, EKS).
+    Agents are deployed separately via the agentcore CLI:
+        bash scripts/deploy-agents.sh
+
+    After deployment, agent ARNs are read from environment variables:
+        SECURITY_ANALYZER_AGENT_ARN, CRAWLER_AGENT_ARN, PROPERTY_ANALYZER_AGENT_ARN
     """
 
     def __init__(
@@ -44,100 +50,52 @@ class AgentsStack(Stack):
 
         self.config = config
 
-        if not HAS_AGENTCORE_CDK:
-            raise ImportError(
-                "aws-cdk.aws-bedrock-agentcore-alpha is required. "
-                "Install with: pip install aws-cdk.aws-bedrock-agentcore-alpha"
-            )
-
-        # S3 bucket for agent code artifacts
+        # S3 bucket for agent code (reference / artifact storage)
         self.code_bucket = s3.Bucket(
             self,
             "AgentCodeBucket",
-            bucket_name=f"cfn-security-agent-code-{config.environment_name}-{self.account}",
+            bucket_name=f"cfn-security-agent-code-{config.environment_name}-{self.account}-{self.region}",
             encryption=s3.BucketEncryption.S3_MANAGED,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
         )
 
-        # Upload agent code to S3
+        # Upload agent code to S3 for reference.
+        # Exclude .bedrock_agentcore/ (agentcore CLI caches ~130MB of deployment
+        # packages there, which exceeds the BucketDeployment Lambda's 128MB memory).
         s3deploy.BucketDeployment(
             self,
             "AgentCodeDeployment",
-            sources=[s3deploy.Source.asset("agents")],
+            sources=[s3deploy.Source.asset("agents", exclude=[
+                ".bedrock_agentcore", ".bedrock_agentcore.yaml",
+            ])],
             destination_bucket=self.code_bucket,
             destination_key_prefix="agents",
+            memory_limit=256,
         )
 
-        # Create agent runtimes
-        self.security_analyzer = self._create_agent_runtime(
-            "SecurityAnalyzer",
-            "cfn-security-analyzer",
-            "Quick security scanner for CloudFormation resources",
-            "security_analyzer_agent.py",
+        # Read agent ARNs from environment variables (set after agentcore deploy)
+        self.security_analyzer = AgentRef(
+            agent_runtime_arn=os.environ.get("SECURITY_ANALYZER_AGENT_ARN", ""),
+        )
+        self.crawler = AgentRef(
+            agent_runtime_arn=os.environ.get("CRAWLER_AGENT_ARN", ""),
+        )
+        self.property_analyzer = AgentRef(
+            agent_runtime_arn=os.environ.get("PROPERTY_ANALYZER_AGENT_ARN", ""),
         )
 
-        self.crawler = self._create_agent_runtime(
-            "Crawler",
-            "cfn-crawler",
-            "Extracts security-relevant properties from CloudFormation documentation",
-            "crawler_agent.py",
+        # Output instructions
+        CfnOutput(
+            self, "AgentCodeBucketName",
+            value=self.code_bucket.bucket_name,
+            description="S3 bucket containing agent code artifacts",
         )
 
-        self.property_analyzer = self._create_agent_runtime(
-            "PropertyAnalyzer",
-            "cfn-property-analyzer",
-            "Deep-dive security analysis of individual CloudFormation properties",
-            "property_analyzer_agent.py",
-        )
-
-    def _create_agent_runtime(
-        self,
-        construct_name: str,
-        runtime_name: str,
-        description: str,
-        entrypoint_file: str,
-    ) -> "agentcore.Runtime":
-        """Create a Bedrock AgentCore Runtime for an agent.
-
-        Args:
-            construct_name: CDK construct ID
-            runtime_name: AgentCore runtime name
-            description: Agent description
-            entrypoint_file: Python file in agents/ directory
-
-        Returns:
-            AgentCore Runtime construct
-        """
-        artifact = agentcore.AgentRuntimeArtifact.from_s3(
-            s3.Location(
-                bucket_name=self.code_bucket.bucket_name,
-                object_key=f"agents/{entrypoint_file}",
-            ),
-            agentcore.AgentCoreRuntime.PYTHON_3_11,
-            [entrypoint_file],
-        )
-
-        runtime = agentcore.Runtime(
-            self,
-            construct_name,
-            runtime_name=f"{runtime_name}-{self.config.environment_name}",
-            agent_runtime_artifact=artifact,
-            description=description,
-            environment_variables={
-                "ENVIRONMENT": self.config.environment_name,
-            },
-        )
-
-        # Grant Bedrock model invocation
-        runtime.role.add_to_policy(
-            iam.PolicyStatement(
-                actions=["bedrock:InvokeModel"],
-                resources=[
-                    f"arn:aws:bedrock:{self.region}::foundation-model/us.anthropic.claude-3-5-sonnet-*"
-                ],
+        if not self.security_analyzer.agent_runtime_arn:
+            CfnOutput(
+                self, "DeployAgentsCommand",
+                value="bash scripts/deploy-agents.sh",
+                description="Run this to deploy AgentCore agents, then re-run cdk deploy",
             )
-        )
-
-        return runtime

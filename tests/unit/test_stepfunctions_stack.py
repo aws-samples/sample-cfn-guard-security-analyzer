@@ -96,7 +96,8 @@ def test_three_lambda_functions_created(template):
 def test_alb_endpoint_url_defaults_to_empty():
     """When alb_endpoint_url is not provided, it should default to empty string."""
     app = cdk.App()
-    db_stack = cdk.Stack(app, "DbStack2")
+    test_env = cdk.Environment(account="123456789012", region="us-east-1")
+    db_stack = cdk.Stack(app, "DbStack2", env=test_env)
     analysis_table = dynamodb.Table(
         db_stack,
         "AnalysisTable",
@@ -115,7 +116,7 @@ def test_alb_endpoint_url_defaults_to_empty():
             region="us-east-1",
         ),
         analysis_table=analysis_table,
-        env=cdk.Environment(account="123456789012", region="us-east-1"),
+        env=test_env,
     )
     tmpl = assertions.Template.from_stack(stack)
     tmpl.has_resource_properties(

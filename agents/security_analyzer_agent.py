@@ -1,3 +1,4 @@
+import os
 """Security Analyzer Agent for CloudFormation resources.
 
 This agent performs quick security scans of CloudFormation resources,
@@ -46,7 +47,7 @@ Return results in JSON format with this structure:
 security_analyzer = Agent(
     system_prompt=SYSTEM_PROMPT,
     tools=[http_request],
-    model="us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+    model=os.environ.get("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
 )
 
 

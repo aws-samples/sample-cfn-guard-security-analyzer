@@ -65,7 +65,7 @@ class StorageStack(Stack):
         bucket = s3.Bucket(
             self,
             "FrontendBucket",
-            bucket_name=f"cfn-security-frontend-{self.config.environment_name}-{self.account}",
+            bucket_name=f"cfn-security-frontend-{self.config.environment_name}-{self.account}-{self.region}",
             encryption=s3.BucketEncryption.S3_MANAGED,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             removal_policy=RemovalPolicy.DESTROY if self.config.environment_name != "prod" else RemovalPolicy.RETAIN,
@@ -84,7 +84,7 @@ class StorageStack(Stack):
         bucket = s3.Bucket(
             self,
             "ReportsBucket",
-            bucket_name=f"cfn-security-reports-{self.config.environment_name}-{self.account}",
+            bucket_name=f"cfn-security-reports-{self.config.environment_name}-{self.account}-{self.region}",
             encryption=s3.BucketEncryption.S3_MANAGED,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             removal_policy=RemovalPolicy.DESTROY if self.config.environment_name != "prod" else RemovalPolicy.RETAIN,
@@ -112,7 +112,7 @@ class StorageStack(Stack):
         cache_policy = cloudfront.CachePolicy(
             self,
             "FrontendCachePolicy",
-            cache_policy_name=f"cfn-security-frontend-{self.config.environment_name}",
+            cache_policy_name=f"cfn-security-frontend-{self.config.environment_name}-{self.region}",
             comment="Cache policy for frontend with short TTL for JS/CSS",
             default_ttl=Duration.minutes(5),  # Short default TTL
             min_ttl=Duration.seconds(0),
@@ -124,13 +124,21 @@ class StorageStack(Stack):
             enable_accept_encoding_brotli=True,
         )
         
+        # Create OAC explicitly with region in construct ID.
+        # CloudFront is a global service — auto-generated OAC names collide
+        # when the same stack is deployed to multiple regions in one account.
+        oac = cloudfront.S3OriginAccessControl(
+            self, f"FrontendOAC-{self.region}",
+        )
+
         # Create distribution
         distribution = cloudfront.Distribution(
             self,
             "FrontendDistribution",
             default_behavior=cloudfront.BehaviorOptions(
-                origin=origins.S3BucketOrigin(
+                origin=origins.S3BucketOrigin.with_origin_access_control(
                     self.frontend_bucket,
+                    origin_access_control=oac,
                 ),
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                 allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,

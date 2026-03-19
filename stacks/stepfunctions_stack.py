@@ -93,89 +93,8 @@ class StepFunctionsStack(Stack):
             name,
             function_name=f"cfn-security-{name.lower()}-{self.config.environment_name}",
             runtime=lambda_.Runtime.PYTHON_3_11,
-            handler="index.handler",
-            code=lambda_.Code.from_inline(f"""
-import json
-import re
-import boto3
-
-bedrock_agentcore = boto3.client('bedrock-agentcore')
-
-
-def extract_json_from_text(text):
-    \"\"\"Extract the first JSON object from text that may contain markdown code fences.\"\"\"
-    # Try direct parse first
-    try:
-        return json.loads(text)
-    except (json.JSONDecodeError, TypeError):
-        pass
-    # Extract from markdown code fences: ```json ... ``` or ``` ... ```
-    pattern = r'```(?:json)?\\s*\\n?(\\{{.*?\\}})\\s*\\n?```'
-    matches = re.findall(pattern, text, re.DOTALL)
-    for match in matches:
-        try:
-            return json.loads(match)
-        except json.JSONDecodeError:
-            continue
-    # Try to find any JSON object in the text
-    pattern2 = r'(\\{{[^{{}}]*\"properties\"\\s*:\\s*\\[.*?\\]\\s*\\}})'
-    matches2 = re.findall(pattern2, text, re.DOTALL)
-    for match in matches2:
-        try:
-            return json.loads(match)
-        except json.JSONDecodeError:
-            continue
-    return None
-
-
-def handler(event, context):
-    agent_arn = event['agentArn']
-    session_id = event['sessionId']
-    input_text = event['inputText']
-    
-    try:
-        # Invoke AgentCore agent
-        response = bedrock_agentcore.invoke_agent_runtime(
-            agentRuntimeArn=agent_arn,
-            runtimeSessionId=session_id,
-            payload=json.dumps({{"prompt": input_text}}).encode('utf-8')
-        )
-        
-        # Parse response from streaming body
-        response_body = json.loads(response['response'].read().decode('utf-8'))
-        
-        # Extract result
-        if 'output' in response_body:
-            result_text = response_body['output']
-        elif 'response' in response_body:
-            result_text = response_body['response']
-        else:
-            result_text = json.dumps(response_body)
-        
-        # Parse result_text — handle markdown code fences from agent responses
-        if isinstance(result_text, str):
-            parsed_result = extract_json_from_text(result_text)
-            if parsed_result is None:
-                return {{
-                    'rawResponse': result_text,
-                    'parsed': False
-                }}
-        else:
-            parsed_result = result_text
-        
-        # If the parsed result has a 'result' field that's a string, try to extract JSON
-        if isinstance(parsed_result, dict) and 'result' in parsed_result:
-            if isinstance(parsed_result['result'], str):
-                extracted = extract_json_from_text(parsed_result['result'])
-                if extracted is not None:
-                    parsed_result['result'] = extracted
-        
-        return parsed_result
-            
-    except Exception as e:
-        print(f"Agent invocation error: {{str(e)}}")
-        raise
-"""),
+            handler="agent_invoker.handler",
+            code=lambda_.Code.from_asset("lambda"),
             timeout=Duration.seconds(300),
             memory_size=512,
             role=role,
@@ -212,50 +131,8 @@ def handler(event, context):
             "ProgressNotifier",
             function_name=f"cfn-security-progress-notifier-{self.config.environment_name}",
             runtime=lambda_.Runtime.PYTHON_3_11,
-            handler="index.handler",
-            code=lambda_.Code.from_inline(
-                'import json\n'
-                'import os\n'
-                'import urllib.request\n'
-                '\n'
-                'ALB_ENDPOINT_URL = os.environ.get("ALB_ENDPOINT_URL", "")\n'
-                '\n'
-                'def handler(event, context):\n'
-                '    analysis_id = event["analysisId"]\n'
-                '    step = event.get("step", "unknown")\n'
-                '    status = event.get("status", "IN_PROGRESS")\n'
-                '    detail = event.get("detail", {})\n'
-                '\n'
-                '    if not ALB_ENDPOINT_URL:\n'
-                '        print("ALB_ENDPOINT_URL not set, skipping notification")\n'
-                '        return {"notified": False, "reason": "ALB_ENDPOINT_URL not configured"}\n'
-                '\n'
-                '    url = f"{ALB_ENDPOINT_URL}/callbacks/progress"\n'
-                '    payload = json.dumps({\n'
-                '        "analysisId": analysis_id,\n'
-                '        "updateData": {\n'
-                '            "step": step,\n'
-                '            "status": status,\n'
-                '            "detail": detail,\n'
-                '        },\n'
-                '    }).encode("utf-8")\n'
-                '\n'
-                '    req = urllib.request.Request(\n'
-                '        url,\n'
-                '        data=payload,\n'
-                '        headers={"Content-Type": "application/json"},\n'
-                '        method="POST",\n'
-                '    )\n'
-                '\n'
-                '    try:\n'
-                '        with urllib.request.urlopen(req, timeout=10) as resp:\n'
-                '            body = resp.read().decode("utf-8")\n'
-                '            print(f"Progress notification sent: {body}")\n'
-                '            return {"notified": True, "response": body}\n'
-                '    except Exception as e:\n'
-                '        print(f"Failed to send progress notification: {e}")\n'
-                '        return {"notified": False, "error": str(e)}\n'
-            ),
+            handler="progress_notifier.handler",
+            code=lambda_.Code.from_asset("lambda"),
             timeout=Duration.seconds(30),
             memory_size=128,
             role=role,

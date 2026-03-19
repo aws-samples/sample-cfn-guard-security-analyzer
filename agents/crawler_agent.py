@@ -1,3 +1,4 @@
+import os
 """Crawler Agent for CloudFormation documentation.
 
 This agent extracts security-relevant properties from CloudFormation
@@ -47,7 +48,7 @@ Be thorough but concise. Extract all security-relevant properties from the docum
 crawler_agent = Agent(
     system_prompt=SYSTEM_PROMPT,
     tools=[http_request],
-    model="us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+    model=os.environ.get("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
 )
 
 

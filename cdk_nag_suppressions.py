@@ -10,9 +10,18 @@ from cdk_nag import NagSuppressions, NagPackSuppression
 
 def apply_suppressions(app) -> None:
     """Apply cdk-nag suppressions to all stacks in the app."""
+    import aws_cdk as cdk
 
+    for child in app.node.children:
+        if not isinstance(child, cdk.Stack):
+            continue
+        _apply_to_stack(child)
+
+
+def _apply_to_stack(stack) -> None:
+    """Apply suppressions to a single stack."""
     NagSuppressions.add_stack_suppressions(
-        app,
+        stack,
         [
             # --- IAM Managed Policies (AwsSolutions-IAM4) ---
             NagPackSuppression(
@@ -143,6 +152,13 @@ def apply_suppressions(app) -> None:
             NagPackSuppression(
                 id="AwsSolutions-SQS4",
                 reason="No SQS queues in this sample — suppressed for CDK internal constructs.",
+            ),
+            NagPackSuppression(
+                id="AwsSolutions-CFR7",
+                reason=(
+                    "CloudFront distribution uses OAI for S3 origin access. "
+                    "OAC migration is a production hardening step."
+                ),
             ),
         ],
         apply_to_nested_stacks=True,

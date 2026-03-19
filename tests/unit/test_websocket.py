@@ -78,10 +78,10 @@ def test_connect_registers_in_manager(client, aws_env):
 
 
 def test_connect_ttl_is_approximately_2_hours(client, aws_env):
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
     table, _ = aws_env
-    expected_ttl = int((datetime.utcnow() + timedelta(hours=2)).timestamp())
+    expected_ttl = int((datetime.now(timezone.utc) + timedelta(hours=2)).timestamp())
     with client.websocket_connect("/ws"):
         items = table.scan()["Items"]
         ttl = int(items[0]["ttl"])

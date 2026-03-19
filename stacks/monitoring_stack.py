@@ -74,7 +74,7 @@ class MonitoringStack(Stack):
         dashboard = cloudwatch.Dashboard(
             self,
             "Dashboard",
-            dashboard_name=f"CfnSecurityAnalyzer-{self.config.environment_name}",
+            dashboard_name=f"CfnSecurityAnalyzer-{self.config.environment_name}-{self.region}",
         )
 
         # Add Lambda metrics widgets (only if Lambda functions are provided)

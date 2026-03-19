@@ -1,3 +1,4 @@
+import os
 """Property Analyzer Agent for CloudFormation properties.
 
 This agent performs detailed security analysis of individual CloudFormation
@@ -51,7 +52,7 @@ Focus on:
 property_analyzer = Agent(
     system_prompt=SYSTEM_PROMPT,
     tools=[http_request],
-    model="us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+    model=os.environ.get("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
 )
 
 

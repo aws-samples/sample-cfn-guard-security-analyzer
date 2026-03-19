@@ -6,33 +6,26 @@ const isLocalhost =
   (window.location.hostname === "localhost" ||
     window.location.hostname === "127.0.0.1");
 
-/**
- * Toggle between EKS (default) and Legacy API Gateway endpoints.
- * Set to true to fall back to the original Lambda + API Gateway stack.
- */
-const USE_LEGACY = false;
-
 // --- Endpoint URLs ---
+// For local development, the FastAPI backend runs on localhost:8000.
+// For production, set these to your ALB DNS name after deploying the EKS stack.
+// The ALB endpoint is shown in the CDK output: CfnSecurityAnalyzer-Eks-v2-dev.AlbDnsName
 
 const LOCAL_API_URL = "http://localhost:8000";
 const LOCAL_WS_URL = "ws://localhost:8000/ws";
 
-const EKS_API_URL = "https://your-alb-endpoint.example.com";
-const EKS_WS_URL = "wss://your-alb-endpoint.example.com/ws";
-
-const LEGACY_API_URL =
-  "https://your-api-gateway-id.execute-api.us-east-1.amazonaws.com/dev";
-const LEGACY_WS_URL =
-  "wss://your-websocket-api-id.execute-api.us-east-1.amazonaws.com/dev";
+// Production: use relative URLs — CloudFront proxies /api/* and /ws to the ALB
+const EKS_API_URL = "";
+const EKS_WS_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`;
 
 function resolveApiUrl(): string {
   if (isLocalhost) return LOCAL_API_URL;
-  return USE_LEGACY ? LEGACY_API_URL : EKS_API_URL;
+  return EKS_API_URL;
 }
 
 function resolveWsUrl(): string {
   if (isLocalhost) return LOCAL_WS_URL;
-  return USE_LEGACY ? LEGACY_WS_URL : EKS_WS_URL;
+  return EKS_WS_URL;
 }
 
 // --- Exported config ---

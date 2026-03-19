@@ -10,12 +10,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="CloudFormation Security Analyzer")
 
-# CORS middleware — Requirement 10.1
-# Configure via CORS_ORIGINS env var (comma-separated). Default "*" for local dev.
+# CORS middleware — restrict origins via CORS_ORIGINS env var (comma-separated).
+# Defaults to localhost for local dev. Set to your CloudFront/ALB domain for production.
+_default_origins = "http://localhost:5173,http://localhost:8000"
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
-    allow_methods=["*"],
+    allow_origins=os.environ.get("CORS_ORIGINS", _default_origins).split(","),
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=[
         "Content-Type",
         "Authorization",

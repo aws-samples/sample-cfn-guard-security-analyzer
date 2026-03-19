@@ -1,4 +1,6 @@
 """EKS Fargate stack for CloudFormation Security Analyzer."""
+import os
+import aws_cdk as cdk
 from aws_cdk import (
     Stack,
     CfnOutput,
@@ -100,6 +102,9 @@ class EksStack(Stack):
         Returns:
             EKS Cluster construct
         """
+        # 2 AZs is sufficient for HA and avoids Elastic IP quota issues (default quota is 5)
+        vpc = ec2.Vpc(self, "EksVpc", max_azs=2)
+
         cluster = eks.Cluster(
             self,
             "EksCluster",
@@ -107,7 +112,16 @@ class EksStack(Stack):
             version=eks.KubernetesVersion.V1_31,
             kubectl_layer=KubectlV31Layer(self, "KubectlLayer"),
             default_capacity=0,  # Fargate only, no managed node group
+            vpc=vpc,
         )
+
+        # Tag VPC subnets for AWS Load Balancer Controller discovery.
+        # The controller uses these tags to determine which subnets to place ALBs in.
+        # Applied at the VPC level to avoid circular dependencies with cluster resources.
+        for subnet in cluster.vpc.public_subnets:
+            cdk.Tags.of(subnet).add("kubernetes.io/role/elb", "1")
+        for subnet in cluster.vpc.private_subnets:
+            cdk.Tags.of(subnet).add("kubernetes.io/role/internal-elb", "1")
 
         # Fargate profile for the application namespace
         cluster.add_fargate_profile(
@@ -123,16 +137,16 @@ class EksStack(Stack):
             selectors=[eks.Selector(namespace="kube-system")],
         )
 
-        # Patch CoreDNS for Fargate — required for DNS resolution
-        coredns_patch = cluster.add_manifest(
+        # Patch CoreDNS for Fargate — required for DNS resolution.
+        # Uses KubernetesPatch (strategic merge) instead of add_manifest (kubectl apply)
+        # to avoid "spec.selector: Required value" errors on partial Deployment specs.
+        coredns_patch = eks.KubernetesPatch(
+            self,
             "CoreDnsFargatePatch",
-            {
-                "apiVersion": "apps/v1",
-                "kind": "Deployment",
-                "metadata": {
-                    "name": "coredns",
-                    "namespace": "kube-system",
-                },
+            cluster=cluster,
+            resource_name="deployment/coredns",
+            resource_namespace="kube-system",
+            apply_patch={
                 "spec": {
                     "template": {
                         "metadata": {
@@ -141,7 +155,18 @@ class EksStack(Stack):
                             }
                         }
                     }
-                },
+                }
+            },
+            restore_patch={
+                "spec": {
+                    "template": {
+                        "metadata": {
+                            "annotations": {
+                                "eks.amazonaws.com/compute-type": "ec2",
+                            }
+                        }
+                    }
+                }
             },
         )
 
@@ -184,11 +209,13 @@ class EksStack(Stack):
         # Step Functions start execution
         state_machine.grant_start_execution(sa)
 
-        # Bedrock AgentCore invoke
+        # Bedrock AgentCore invoke — scoped to this account's runtimes
         sa.add_to_principal_policy(
             iam.PolicyStatement(
                 actions=["bedrock-agentcore:InvokeAgentRuntime"],
-                resources=["*"],
+                resources=[
+                    f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:runtime/*",
+                ],
             )
         )
 
@@ -232,13 +259,17 @@ class EksStack(Stack):
             )
         )
 
-        # Install Helm chart — tell it NOT to create the SA (CDK already did)
+        # Install Helm chart — tell it NOT to create the SA (CDK already did).
+        # wait=True ensures controller pods are healthy before CDK proceeds,
+        # which is critical because the controller's ValidatingWebhook must be
+        # serving before any Ingress resource can be created.
         chart = self.cluster.add_helm_chart(
             "AwsLoadBalancerController",
             chart="aws-load-balancer-controller",
             repository="https://aws.github.io/eks-charts",
             namespace="kube-system",
             release="aws-load-balancer-controller",
+            wait=True,
             values={
                 "clusterName": self.cluster.cluster_name,
                 "serviceAccount": {
@@ -337,6 +368,18 @@ class EksStack(Stack):
                                         "name": "DEPLOY_HASH",
                                         "value": deploy_hash,
                                     },
+                                    {
+                                        "name": "SECURITY_ANALYZER_AGENT_ARN",
+                                        "value": os.environ.get("SECURITY_ANALYZER_AGENT_ARN", ""),
+                                    },
+                                    {
+                                        "name": "CRAWLER_AGENT_ARN",
+                                        "value": os.environ.get("CRAWLER_AGENT_ARN", ""),
+                                    },
+                                    {
+                                        "name": "PROPERTY_ANALYZER_AGENT_ARN",
+                                        "value": os.environ.get("PROPERTY_ANALYZER_AGENT_ARN", ""),
+                                    },
                                 ],
                             }
                         ],
@@ -372,13 +415,52 @@ class EksStack(Stack):
         service = self.cluster.add_manifest("AppService", service_manifest)
         service.node.add_dependency(self.app_namespace)
 
+        # --- Ingress (HTTP ALB, internet-facing) ---
+        ingress_manifest = {
+            "apiVersion": "networking.k8s.io/v1",
+            "kind": "Ingress",
+            "metadata": {
+                "name": f"{app_label}-ingress",
+                "namespace": namespace,
+                "annotations": {
+                    "alb.ingress.kubernetes.io/scheme": "internet-facing",
+                    "alb.ingress.kubernetes.io/target-type": "ip",
+                    "alb.ingress.kubernetes.io/healthcheck-path": "/health",
+                },
+            },
+            "spec": {
+                "ingressClassName": "alb",
+                "rules": [
+                    {
+                        "http": {
+                            "paths": [
+                                {
+                                    "path": "/",
+                                    "pathType": "Prefix",
+                                    "backend": {
+                                        "service": {
+                                            "name": app_label,
+                                            "port": {"number": 8000},
+                                        }
+                                    },
+                                }
+                            ]
+                        }
+                    }
+                ],
+            },
+        }
+
+        ingress = self.cluster.add_manifest("AppIngress", ingress_manifest)
+        ingress.node.add_dependency(service)
+        ingress.node.add_dependency(self.lb_helm_chart)
+
         # --- Exports ---
-        # Ingress is managed inline above (AppIngress manifest) via the ALB Ingress Controller
         CfnOutput(
             self,
             "AlbDnsName",
-            value="Post-deploy: kubectl apply -f k8s/ingress.yaml",
-            description="Apply ingress after ALB controller pods are running",
+            value=f"kubectl get ingress -n {namespace} -o jsonpath='{{.items[0].status.loadBalancer.ingress[0].hostname}}'",
+            description="Run this command to get the ALB DNS after pods are running",
             export_name=f"cfn-security-alb-dns-v2-{self.config.environment_name}",
         )
 

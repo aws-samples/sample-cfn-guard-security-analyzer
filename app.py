@@ -60,6 +60,7 @@ stepfunctions_stack = StepFunctionsStack(
 )
 
 # Create EKS Fargate stack
+# Set CDK_ADMIN_USERNAME to an IAM username to grant kubectl access to the cluster.
 eks_stack = EksStack(
     app,
     f"CfnSecurityAnalyzer-Eks-v2-{config.environment_name}",
@@ -68,6 +69,7 @@ eks_stack = EksStack(
     connection_table=database_stack.connection_table,
     reports_bucket=storage_stack.reports_bucket,
     state_machine=stepfunctions_stack.state_machine,
+    admin_username=os.getenv("CDK_ADMIN_USERNAME", ""),
     env=cdk.Environment(account=config.account, region=config.region),
 )
 
