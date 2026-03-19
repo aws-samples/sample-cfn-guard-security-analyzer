@@ -71,6 +71,8 @@ The walkthrough above shows:
 
 ## Example Output
 
+### Security Analysis
+
 ```
 Resource: AWS::S3::Bucket
 
@@ -86,10 +88,37 @@ Resource: AWS::S3::Bucket
   HIGH      VersioningConfiguration
             Threat: No protection against accidental deletion or ransomware
             Fix: Enable versioning with MFA delete
+```
 
-  HIGH      LoggingConfiguration
-            Threat: No audit trail for bucket access
-            Fix: Enable server access logging to a separate bucket
+### Generated Guard Rule
+
+Click "Generate Guard Rule" on any property to get a ready-to-use rule:
+
+```
+let s3_buckets = Resources.*[ Type == "AWS::S3::Bucket" ]
+
+rule ensure_s3_bucket_encryption when %s3_buckets !empty {
+    %s3_buckets {
+        Properties.BucketEncryption exists
+            <<S3 bucket must have encryption configured>>
+        Properties.BucketEncryption {
+            ServerSideEncryptionConfiguration exists
+                <<Must specify server-side encryption configuration>>
+            ServerSideEncryptionConfiguration[*] {
+                ServerSideEncryptionByDefault exists
+                    <<Must specify default encryption settings>>
+                ServerSideEncryptionByDefault.SSEAlgorithm IN ["AES256", "aws:kms"]
+                    <<Encryption algorithm must be AES256 or aws:kms>>
+            }
+        }
+    }
+}
+```
+
+Validate the rule locally with [cfn-guard](https://github.com/aws-cloudformation/cloudformation-guard):
+
+```bash
+cfn-guard validate -r rules.guard -d template.yaml
 ```
 
 ## Prerequisites
