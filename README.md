@@ -1,4 +1,4 @@
-# CloudFormation Guard — AI Security Analyzer
+# CloudFormation Guard Security Analyzer
 
 > **Important:** This is sample code for demonstration and educational purposes only. It is not intended for production use without further review and hardening. You should work with your security and legal teams to meet your organizational security, regulatory, and compliance requirements before deployment.
 
