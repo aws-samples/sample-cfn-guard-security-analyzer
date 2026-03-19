@@ -42,8 +42,8 @@ Provide a comprehensive analysis in JSON format with this structure:
 
 Focus on:
 - How this property affects security posture
-- What can go wrong with incorrect configuration
-- How to configure it securely
+- Security implications of different configuration choices
+- Recommended configuration for security hardening
 - What other properties should be set alongside it
 """
 

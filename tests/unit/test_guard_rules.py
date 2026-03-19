@@ -23,7 +23,7 @@ VALID_REQUEST = {
     "resourceUrl": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-s3-bucket.html",
     "propertyName": "BucketEncryption",
     "riskLevel": "CRITICAL",
-    "securityImplication": "Data at rest exposed without encryption",
+    "securityImplication": "Data at rest not protected by encryption",
     "recommendation": "Enable SSE-S3 or SSE-KMS encryption",
 }
 

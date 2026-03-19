@@ -2,7 +2,7 @@
 
 > **Important:** This is sample code for demonstration and educational purposes only. It is not intended for production use without further review and hardening. You should work with your security and legal teams to meet your organizational security, regulatory, and compliance requirements before deployment.
 
-An AI-powered tool that analyzes AWS CloudFormation resource configurations for security vulnerabilities and generates custom [CloudFormation Guard](https://github.com/aws-cloudformation/cloudformation-guard) rules. Point it at any CloudFormation resource documentation URL — it identifies security-critical properties, assesses risk levels, provides remediation recommendations, and generates ready-to-use Guard rules you can plug into your CI/CD pipeline. Powered by [Amazon Bedrock AgentCore](https://docs.aws.amazon.com/bedrock/latest/userguide/agentcore.html).
+An AI-powered tool that reads AWS CloudFormation resource documentation, identifies security-critical configuration properties, and generates custom [CloudFormation Guard](https://github.com/aws-cloudformation/cloudformation-guard) rules for security hardening. Point it at any CloudFormation resource documentation URL — it assesses risk levels, provides hardening recommendations, and generates ready-to-use Guard rules you can plug into your CI/CD pipeline. Powered by [Amazon Bedrock AgentCore](https://docs.aws.amazon.com/bedrock/latest/userguide/agentcore.html).
 
 ## What It Does
 
@@ -12,7 +12,7 @@ This tool complements the existing Guard ecosystem by using AI agents to automat
 
 1. **Scan** any CloudFormation resource documentation and identify every security-relevant property
 2. **Assess** each property's risk level (CRITICAL / HIGH / MEDIUM / LOW) with specific threat descriptions
-3. **Recommend** secure configurations with actionable remediation steps
+3. **Recommend** security best practices with actionable hardening steps
 4. **Generate custom Guard rules** for any identified property — valid cfn-guard 3.x rules with pass/fail test templates, ready to plug into your CI/CD pipeline
 
 ## Architecture
@@ -40,7 +40,7 @@ User → Frontend → FastAPI (SSE) → Bedrock AgentCore → Security Analyzer 
                                           ← Property-by-property streaming ←
 ```
 
-**Step 2: Generate Guard Rules (per property)** — Click "Generate Guard Rule" on any finding:
+**Step 2: Generate Guard Rules (per property)** — Click "Generate Guard Rule" on any identified property:
 
 ```
 PropertyCard → FastAPI (POST /guard-rules) → Guard Rule Generator Agent
@@ -71,7 +71,7 @@ The walkthrough above shows:
 
 ### Generated Guard Rule
 
-The main output — click "Generate Guard Rule" on any property to get a production-ready rule:
+The main output — click "Generate Guard Rule" on any property to get a ready-to-use rule:
 
 ```
 let s3_buckets = Resources.*[ Type == "AWS::S3::Bucket" ]
@@ -98,28 +98,28 @@ Each generated rule includes pass/fail CloudFormation templates. Validate locall
 
 ```bash
 cfn-guard validate -r rules.guard -d template.yaml
-# FAIL → insecure template blocked
-# PASS → secure template allowed
+# FAIL → non-compliant template blocked
+# PASS → compliant template allowed
 ```
 
 ### Security Analysis (input to rule generation)
 
-The scan identifies which properties need Guard rules:
+The scan identifies which properties are relevant for Guard rules:
 
 ```
 Resource: AWS::S3::Bucket
 
   CRITICAL  BucketEncryption
-            Threat: Data at rest exposed without encryption
+            Threat: Data at rest not protected by encryption
             Fix: Enable SSE-S3 or SSE-KMS encryption
 
   CRITICAL  PublicAccessBlockConfiguration
-            Threat: Bucket contents publicly accessible
+            Threat: No explicit public access block configured
             Fix: Set BlockPublicAcls, BlockPublicPolicy, IgnorePublicAcls,
                  RestrictPublicBuckets to true
 
   HIGH      VersioningConfiguration
-            Threat: No protection against accidental deletion or ransomware
+            Threat: No versioning protection against accidental deletion or overwrites
             Fix: Enable versioning with MFA delete
 ```
 

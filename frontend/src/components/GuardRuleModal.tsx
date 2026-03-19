@@ -94,11 +94,11 @@ export default function GuardRuleModal({
           <SpaceBetween size="m">
             <CopyableCodeBlock
               code={rule.passTemplate}
-              label="Pass Template (secure configuration)"
+              label="Pass Template (compliant configuration)"
             />
             <CopyableCodeBlock
               code={rule.failTemplate}
-              label="Fail Template (insecure configuration)"
+              label="Fail Template (non-compliant configuration)"
             />
           </SpaceBetween>
         </ExpandableSection>

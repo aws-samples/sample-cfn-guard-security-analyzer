@@ -1,4 +1,4 @@
-/** Risk level for a security property finding. */
+/** Risk level for a security property. */
 export type RiskLevel = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 
 /** Activity log entry type. */
@@ -11,7 +11,7 @@ export type AnalysisStatus = "idle" | "in_progress" | "completed" | "failed";
 export type AnalysisType = "quick" | "detailed";
 
 /**
- * A single security property finding returned by the analysis.
+ * A single security property returned by the analysis.
  * Validates: Requirement 12.1
  */
 export interface PropertyData {

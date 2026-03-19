@@ -23,7 +23,7 @@ For each security property, provide:
 Focus on properties that directly impact security posture, such as:
 - Encryption settings
 - Access control configurations
-- Network exposure
+- Network configuration
 - Logging and monitoring
 - Authentication and authorization
 
@@ -35,7 +35,7 @@ Return results in JSON format with this structure:
       "name": "PropertyName",
       "riskLevel": "CRITICAL|HIGH|MEDIUM|LOW",
       "securityImplication": "Description of security impact",
-      "recommendation": "Recommended secure configuration"
+      "recommendation": "Recommended configuration for hardening"
     }
   ],
   "analysisTimestamp": "ISO 8601 timestamp"

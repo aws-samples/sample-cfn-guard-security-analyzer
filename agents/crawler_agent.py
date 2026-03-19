@@ -35,7 +35,7 @@ Return only security-relevant properties in JSON format with the structure:
 Focus on properties related to:
 - Encryption and data protection
 - Access control and IAM
-- Network security and exposure
+- Network security and configuration
 - Logging and monitoring
 - Authentication and authorization
 - Compliance and governance

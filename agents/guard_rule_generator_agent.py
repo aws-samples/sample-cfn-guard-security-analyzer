@@ -40,7 +40,7 @@ class GuardRuleOutput(BaseModel):
     )
     fail_template: str = Field(
         description="Minimal CloudFormation YAML template that FAILS this rule. "
-        "Must show the insecure or missing configuration that the rule catches."
+        "Must show the non-compliant or missing configuration that the rule catches."
     )
 
 
@@ -154,7 +154,7 @@ Risk Level: {risk_level}
 Security Issue: {security_implication}
 Recommendation: {recommendation}
 
-Generate a comprehensive Guard rule that enforces the secure configuration for this property."""
+Generate a comprehensive Guard rule that enforces security best practices for this property."""
 
     # Structured output is enforced at the Agent level via tool_use.
     # Strands SDK converts GuardRuleOutput → Bedrock tool spec → forces

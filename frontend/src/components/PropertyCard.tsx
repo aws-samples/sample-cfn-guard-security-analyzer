@@ -22,7 +22,7 @@ const RISK_BADGE_COLOR: Record<RiskLevel, "red" | "grey" | "blue" | "green"> = {
 };
 
 /**
- * Renders a single security property finding card.
+ * Renders a single security property card.
  * Validates: Requirements 9.1, 9.2, 9.3, 9.4, 9.5
  */
 export default function PropertyCard({

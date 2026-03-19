@@ -120,7 +120,7 @@ export default function ResultsSection({ analysis }: ResultsSectionProps) {
             </Button>
           }
         >
-          Analysis Results ({analysis.results.length} findings)
+          Analysis Results ({analysis.results.length} properties)
         </Header>
       }
     >
@@ -183,7 +183,7 @@ export default function ResultsSection({ analysis }: ResultsSectionProps) {
 
                   {filtered.length === 0 ? (
                     <Box textAlign="center" color="inherit" padding="l">
-                      No findings match the selected filter.
+                      No properties match the selected filter.
                     </Box>
                   ) : (
                     <Grid
