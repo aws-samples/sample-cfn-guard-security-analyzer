@@ -6,14 +6,14 @@ An AI-powered tool that analyzes AWS CloudFormation resource configurations for 
 
 ## What It Does
 
-CloudFormation templates define your AWS infrastructure, but every resource has dozens of security-relevant properties — encryption settings, public access controls, logging, IAM permissions. Reviewing each one manually is slow, error-prone, and doesn't scale as services evolve.
+[CloudFormation Guard](https://github.com/aws-cloudformation/cloudformation-guard) lets you enforce security policies on CloudFormation templates before deployment — but writing custom Guard rules for every resource property is manual, time-consuming, and requires deep knowledge of both Guard DSL syntax and each resource's security implications.
 
-This tool uses AI agents to automatically:
+This tool automates the entire process using AI agents:
 
-1. **Analyze** any CloudFormation resource documentation and identify every security-relevant property
+1. **Scan** any CloudFormation resource documentation and identify every security-relevant property
 2. **Assess** each property's risk level (CRITICAL / HIGH / MEDIUM / LOW) with specific threat descriptions
 3. **Recommend** secure configurations with actionable remediation steps
-4. **Generate custom [CloudFormation Guard](https://github.com/aws-cloudformation/cloudformation-guard) rules** for the identified properties — ready-to-use policy-as-code that you can integrate into your CI/CD pipeline
+4. **Generate custom Guard rules** for any identified property — valid cfn-guard 3.x rules with pass/fail test templates, ready to plug into your CI/CD pipeline
 
 ## Architecture
 
@@ -32,31 +32,30 @@ This tool uses AI agents to automatically:
 
 ### How It Works
 
-**Quick Scan (10-15 seconds)** — A single Security Analyzer Agent performs a fast sweep, streaming results via SSE:
+**Step 1: Security Scan (10-15 seconds)** — Identify security-relevant properties via Quick Scan:
 
 ```
-User → Frontend → FastAPI (SSE) → Bedrock AgentCore
-                                        ↓
-                        ← Property-by-property streaming ←
+User → Frontend → FastAPI (SSE) → Bedrock AgentCore → Security Analyzer Agent
+                                                              ↓
+                                          ← Property-by-property streaming ←
 ```
 
-**Detailed Analysis (2-5 minutes)** — Multi-agent workflow via Step Functions:
+**Step 2: Generate Guard Rules (per property)** — Click "Generate Guard Rule" on any finding:
+
+```
+PropertyCard → FastAPI (POST /guard-rules) → Guard Rule Generator Agent
+                                                      ↓
+                              ← Guard rule + pass/fail test templates ←
+```
+
+The Guard Rule Generator uses [Strands SDK structured output](https://strandsagents.com/docs/user-guide/concepts/agents/structured-output/) to guarantee valid cfn-guard 3.x rules via tool_use schema enforcement. Each rule includes pass/fail CloudFormation templates for local validation with `cfn-guard validate`.
+
+**Optional: Detailed Analysis (2-5 minutes)** — For deeper analysis, the multi-agent workflow via Step Functions:
 
 1. **Crawler Agent** extracts all security-relevant properties from the CloudFormation docs
 2. **Property Analyzer Agents** deep-dive each property in parallel (up to 8 concurrent)
 3. Progress streams to the frontend via WebSocket in real-time
 4. Results are aggregated and a PDF report is generated
-
-**Guard Rule Generation (per property)** — Click "Generate Guard Rule" on any property card:
-
-```
-PropertyCard → FastAPI (POST /guard-rules) → Guard Rule Generator Agent
-                                                      ↓
-                              ← Structured output (Pydantic) with validated schema ←
-                              ← Guard rule + pass/fail test templates ←
-```
-
-The Guard Rule Generator Agent uses [Strands SDK structured output](https://strandsagents.com/docs/user-guide/concepts/agents/structured-output/) to guarantee the response schema via tool_use enforcement — not prompt engineering. Generated rules use **cfn-guard 3.x syntax** and are validated to work with `cfn-guard validate`.
 
 ## Demo
 
@@ -64,35 +63,15 @@ The Guard Rule Generator Agent uses [Strands SDK structured output](https://stra
 
 The walkthrough above shows:
 1. **Enter a CloudFormation resource URL** — paste any TemplateReference documentation link
-2. **Quick Scan results** — 8 security properties identified in ~15 seconds, each with risk level (Critical/High/Medium/Low), security impact, and remediation recommendation
+2. **Quick Scan** — 8 security properties identified in ~15 seconds with risk levels and recommendations
 3. **Generate Guard Rule** — click the button on any property to generate a cfn-guard 3.x rule with pass/fail test templates
 4. **Guard Rules collection** — add rules to a collection tab, download all as a `.guard` ruleset file ready for CI/CD
-5. **Detailed Analysis** — multi-agent pipeline with real-time progress tracking and PDF report generation
 
 ## Example Output
 
-### Security Analysis
-
-```
-Resource: AWS::S3::Bucket
-
-  CRITICAL  BucketEncryption
-            Threat: Data at rest exposed without encryption
-            Fix: Enable SSE-S3 or SSE-KMS encryption
-
-  CRITICAL  PublicAccessBlockConfiguration
-            Threat: Bucket contents publicly accessible
-            Fix: Set BlockPublicAcls, BlockPublicPolicy, IgnorePublicAcls,
-                 RestrictPublicBuckets to true
-
-  HIGH      VersioningConfiguration
-            Threat: No protection against accidental deletion or ransomware
-            Fix: Enable versioning with MFA delete
-```
-
 ### Generated Guard Rule
 
-Click "Generate Guard Rule" on any property to get a ready-to-use rule:
+The main output — click "Generate Guard Rule" on any property to get a production-ready rule:
 
 ```
 let s3_buckets = Resources.*[ Type == "AWS::S3::Bucket" ]
@@ -115,10 +94,33 @@ rule ensure_s3_bucket_encryption when %s3_buckets !empty {
 }
 ```
 
-Validate the rule locally with [cfn-guard](https://github.com/aws-cloudformation/cloudformation-guard):
+Each generated rule includes pass/fail CloudFormation templates. Validate locally:
 
 ```bash
 cfn-guard validate -r rules.guard -d template.yaml
+# FAIL → insecure template blocked
+# PASS → secure template allowed
+```
+
+### Security Analysis (input to rule generation)
+
+The scan identifies which properties need Guard rules:
+
+```
+Resource: AWS::S3::Bucket
+
+  CRITICAL  BucketEncryption
+            Threat: Data at rest exposed without encryption
+            Fix: Enable SSE-S3 or SSE-KMS encryption
+
+  CRITICAL  PublicAccessBlockConfiguration
+            Threat: Bucket contents publicly accessible
+            Fix: Set BlockPublicAcls, BlockPublicPolicy, IgnorePublicAcls,
+                 RestrictPublicBuckets to true
+
+  HIGH      VersioningConfiguration
+            Threat: No protection against accidental deletion or ransomware
+            Fix: Enable versioning with MFA delete
 ```
 
 ## Prerequisites
@@ -282,12 +284,12 @@ See [`.env.example`](.env.example) for the full list. Key variables:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/analysis` | Start analysis (quick or detailed) |
+| `POST` | `/analysis` | Start security analysis (quick or detailed) |
 | `POST` | `/analysis/stream` | Quick scan with SSE streaming |
 | `GET` | `/analysis/{id}` | Get analysis status and results |
+| `POST` | `/guard-rules` | Generate a CloudFormation Guard rule for a property |
 | `POST` | `/reports/{id}` | Generate PDF security report |
-| `POST` | `/guard-rules` | Generate CFN Guard rule for a property |
-| `WS` | `/ws` | WebSocket for real-time progress |
+| `WS` | `/ws` | WebSocket for real-time progress (detailed analysis) |
 | `POST` | `/callbacks/progress` | Step Functions progress callback |
 | `GET` | `/health` | Health check |
 
