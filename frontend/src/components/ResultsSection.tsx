@@ -8,9 +8,14 @@ import Grid from "@cloudscape-design/components/grid";
 import SpaceBetween from "@cloudscape-design/components/space-between";
 import Box from "@cloudscape-design/components/box";
 import KeyValuePairs from "@cloudscape-design/components/key-value-pairs";
+import Tabs from "@cloudscape-design/components/tabs";
+import Flashbar from "@cloudscape-design/components/flashbar";
 import type { UseAnalysisReturn } from "../hooks/useAnalysis";
 import type { PropertyData, RiskLevel } from "../types";
+import { useGuardRules } from "../hooks/useGuardRules";
 import PropertyCard from "./PropertyCard";
+import GuardRuleModal from "./GuardRuleModal";
+import GuardRulesTab from "./GuardRulesTab";
 import { API_BASE_URL } from "../config";
 
 interface ResultsSectionProps {
@@ -68,6 +73,15 @@ const BADGE_COLOR: Record<RiskLevel, "red" | "grey" | "blue" | "green"> = {
 export default function ResultsSection({ analysis }: ResultsSectionProps) {
   const [filterLevel, setFilterLevel] = useState<FilterLevel>("ALL");
   const [reportLoading, setReportLoading] = useState(false);
+  const guardRules = useGuardRules();
+
+  const handleGenerateGuardRule = (property: PropertyData) => {
+    guardRules.generateRule(
+      property,
+      analysis.resourceUrl ?? "",
+      analysis.resourceType ?? "",
+    );
+  };
 
   const counts = computeSeverityCounts(analysis.results);
   const filtered = filterByRiskLevel(analysis.results, filterLevel);
@@ -111,65 +125,112 @@ export default function ResultsSection({ analysis }: ResultsSectionProps) {
       }
     >
       <SpaceBetween size="l">
-        <KeyValuePairs
-          columns={4}
-          items={[
+        {guardRules.error && (
+          <Flashbar
+            items={[{
+              type: "error",
+              content: guardRules.error,
+              dismissible: true,
+              onDismiss: () => guardRules.clearError(),
+            }]}
+          />
+        )}
+        <Tabs
+          tabs={[
             {
-              label: "Critical",
-              value: (
-                <Badge color={BADGE_COLOR.CRITICAL}>
-                  {counts.CRITICAL}
-                </Badge>
+              id: "results",
+              label: `Analysis Results (${analysis.results.length})`,
+              content: (
+                <SpaceBetween size="l">
+                  <KeyValuePairs
+                    columns={4}
+                    items={[
+                      {
+                        label: "Critical",
+                        value: (
+                          <Badge color={BADGE_COLOR.CRITICAL}>
+                            {counts.CRITICAL}
+                          </Badge>
+                        ),
+                      },
+                      {
+                        label: "High",
+                        value: (
+                          <Badge color={BADGE_COLOR.HIGH}>{counts.HIGH}</Badge>
+                        ),
+                      },
+                      {
+                        label: "Medium",
+                        value: (
+                          <Badge color={BADGE_COLOR.MEDIUM}>
+                            {counts.MEDIUM}
+                          </Badge>
+                        ),
+                      },
+                      {
+                        label: "Low",
+                        value: (
+                          <Badge color={BADGE_COLOR.LOW}>{counts.LOW}</Badge>
+                        ),
+                      },
+                    ]}
+                  />
+
+                  <FormFieldFilter
+                    filterLevel={filterLevel}
+                    onFilterChange={setFilterLevel}
+                  />
+
+                  {filtered.length === 0 ? (
+                    <Box textAlign="center" color="inherit" padding="l">
+                      No findings match the selected filter.
+                    </Box>
+                  ) : (
+                    <Grid
+                      gridDefinition={filtered.map(() => ({
+                        colspan: { default: 12, s: 6, l: 4 },
+                      }))}
+                    >
+                      {filtered.map((property, index) => (
+                        <PropertyCard
+                          key={`${property.name}-${index}`}
+                          property={property}
+                          index={index}
+                          generating={guardRules.generating === property.name}
+                          onGenerateGuardRule={handleGenerateGuardRule}
+                        />
+                      ))}
+                    </Grid>
+                  )}
+                </SpaceBetween>
               ),
             },
-            {
-              label: "High",
-              value: (
-                <Badge color={BADGE_COLOR.HIGH}>{counts.HIGH}</Badge>
-              ),
-            },
-            {
-              label: "Medium",
-              value: (
-                <Badge color={BADGE_COLOR.MEDIUM}>
-                  {counts.MEDIUM}
-                </Badge>
-              ),
-            },
-            {
-              label: "Low",
-              value: (
-                <Badge color={BADGE_COLOR.LOW}>{counts.LOW}</Badge>
-              ),
-            },
+            ...(guardRules.rules.length > 0
+              ? [{
+                  id: "guard-rules",
+                  label: `Guard Rules (${guardRules.rules.length})`,
+                  content: (
+                    <GuardRulesTab
+                      rules={guardRules.rules}
+                      onViewRule={guardRules.openModal}
+                      onRemoveRule={guardRules.removeFromCollection}
+                      onDownloadGuardFile={guardRules.downloadGuardFile}
+                      onDownloadTestTemplates={guardRules.downloadTestTemplates}
+                    />
+                  ),
+                }]
+              : []),
           ]}
         />
-
-        <FormFieldFilter
-          filterLevel={filterLevel}
-          onFilterChange={setFilterLevel}
-        />
-
-        {filtered.length === 0 ? (
-          <Box textAlign="center" color="inherit" padding="l">
-            No findings match the selected filter.
-          </Box>
-        ) : (
-          <Grid
-            gridDefinition={filtered.map(() => ({
-              colspan: { default: 12, s: 6, l: 4 },
-            }))}
-          >
-            {filtered.map((property, index) => (
-              <PropertyCard
-                key={`${property.name}-${index}`}
-                property={property}
-                index={index}
-              />
-            ))}
-          </Grid>
-        )}
       </SpaceBetween>
+      <GuardRuleModal
+        rule={guardRules.modalRule}
+        onDismiss={guardRules.closeModal}
+        onAddToCollection={(rule) => {
+          guardRules.addToCollection(rule);
+          guardRules.closeModal();
+        }}
+      />
     </Container>
   );
 }

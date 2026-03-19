@@ -1,6 +1,7 @@
 import Container from "@cloudscape-design/components/container";
 import Header from "@cloudscape-design/components/header";
 import Badge from "@cloudscape-design/components/badge";
+import Button from "@cloudscape-design/components/button";
 import Box from "@cloudscape-design/components/box";
 import SpaceBetween from "@cloudscape-design/components/space-between";
 import type { PropertyData, RiskLevel } from "../types";
@@ -9,6 +10,8 @@ import { parseNumberedList } from "../utils/parseNumberedList";
 interface PropertyCardProps {
   property: PropertyData;
   index: number;
+  generating?: boolean;
+  onGenerateGuardRule?: (property: PropertyData) => void;
 }
 
 const RISK_BADGE_COLOR: Record<RiskLevel, "red" | "grey" | "blue" | "green"> = {
@@ -22,7 +25,11 @@ const RISK_BADGE_COLOR: Record<RiskLevel, "red" | "grey" | "blue" | "green"> = {
  * Renders a single security property finding card.
  * Validates: Requirements 9.1, 9.2, 9.3, 9.4, 9.5
  */
-export default function PropertyCard({ property }: PropertyCardProps) {
+export default function PropertyCard({
+  property,
+  generating,
+  onGenerateGuardRule,
+}: PropertyCardProps) {
   const badgeColor = RISK_BADGE_COLOR[property.risk_level] ?? "grey";
 
   const recommendation = property.recommendation
@@ -34,7 +41,20 @@ export default function PropertyCard({ property }: PropertyCardProps) {
       header={
         <Header
           variant="h3"
-          actions={<Badge color={badgeColor}>{property.risk_level}</Badge>}
+          actions={
+            <SpaceBetween direction="horizontal" size="xs">
+              {onGenerateGuardRule && (
+                <Button
+                  variant="icon"
+                  iconName="script"
+                  loading={generating}
+                  onClick={() => onGenerateGuardRule(property)}
+                  ariaLabel={`Generate Guard Rule for ${property.name}`}
+                />
+              )}
+              <Badge color={badgeColor}>{property.risk_level}</Badge>
+            </SpaceBetween>
+          }
         >
           {property.name}
         </Header>
