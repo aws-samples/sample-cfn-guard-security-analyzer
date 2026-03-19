@@ -62,3 +62,10 @@ try:
     app.include_router(callbacks.router)
 except ImportError:
     pass
+
+try:
+    from service.routers import guard_rules
+
+    app.include_router(guard_rules.router)
+except ImportError:
+    pass
