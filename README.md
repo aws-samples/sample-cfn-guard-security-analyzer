@@ -2,7 +2,7 @@
 
 > **Important:** This is sample code for demonstration and educational purposes only. It is not intended for production use without further review and hardening. You should work with your security and legal teams to meet your organizational security, regulatory, and compliance requirements before deployment.
 
-An AI-powered tool that automatically analyzes AWS CloudFormation resource configurations for security vulnerabilities. Point it at any CloudFormation resource documentation URL and it identifies security-critical properties, assesses risk levels, and provides actionable remediation recommendations — powered by Amazon Bedrock AgentCore and Claude.
+An AI-powered tool that analyzes AWS CloudFormation resource configurations for security vulnerabilities and generates custom [CloudFormation Guard](https://github.com/aws-cloudformation/cloudformation-guard) rules. Point it at any CloudFormation resource documentation URL — it identifies security-critical properties, assesses risk levels, provides remediation recommendations, and generates ready-to-use Guard rules you can plug into your CI/CD pipeline. Powered by [Amazon Bedrock AgentCore](https://docs.aws.amazon.com/bedrock/latest/userguide/agentcore.html).
 
 ## What It Does
 
@@ -21,7 +21,7 @@ This tool uses AI agents to automatically:
 
 | Service | Purpose |
 |---------|---------|
-| **Amazon Bedrock AgentCore** | Hosts the 4 AI agents (Strands SDK + Claude) |
+| **Amazon Bedrock AgentCore** | Hosts the 4 AI agents (Strands Agents SDK) |
 | **Amazon EKS Fargate** | Runs the FastAPI backend service |
 | **AWS Step Functions** | Orchestrates the detailed multi-agent analysis workflow |
 | **AWS Lambda** | Invokes AgentCore agents from Step Functions |
@@ -35,7 +35,7 @@ This tool uses AI agents to automatically:
 **Quick Scan (10-15 seconds)** — A single Security Analyzer Agent performs a fast sweep, streaming results via SSE:
 
 ```
-User → Frontend → FastAPI (SSE) → Bedrock AgentCore (Claude)
+User → Frontend → FastAPI (SSE) → Bedrock AgentCore
                                         ↓
                         ← Property-by-property streaming ←
 ```
@@ -50,7 +50,7 @@ User → Frontend → FastAPI (SSE) → Bedrock AgentCore (Claude)
 **Guard Rule Generation (per property)** — Click "Generate Guard Rule" on any property card:
 
 ```
-PropertyCard → FastAPI (POST /guard-rules) → Guard Rule Generator Agent (Claude)
+PropertyCard → FastAPI (POST /guard-rules) → Guard Rule Generator Agent
                                                       ↓
                               ← Structured output (Pydantic) with validated schema ←
                               ← Guard rule + pass/fail test templates ←
@@ -101,7 +101,7 @@ Before deploying, ensure the following:
 - **Docker** — must be running (for building the service container)
 - **AWS CDK v2** — `npm install -g aws-cdk`
 - **AWS CLI** — configured with credentials for the target account
-- **Amazon Bedrock model access** — [Enable model access](https://console.aws.amazon.com/bedrock/home#/modelaccess) for **Claude Sonnet 4** (or your preferred model) in the deployment region. Without this, agent invocations will fail with `AccessDeniedException`.
+- **Amazon Bedrock model access** — [Enable model access](https://console.aws.amazon.com/bedrock/home#/modelaccess) for your preferred foundation model in the deployment region. The default is Claude Sonnet 4, but any Bedrock-supported model works. Without model access enabled, agent invocations will fail with `AccessDeniedException`.
 
 ## Deploy
 
@@ -175,7 +175,7 @@ Alternatively, use the AWS console to add an EKS access entry for your IAM role.
 
 ### Model Selection
 
-The AI agents default to **Claude Sonnet 4** (`us.anthropic.claude-sonnet-4-20250514-v1:0`). To use a different model, set:
+The AI agents default to Claude Sonnet 4 (`us.anthropic.claude-sonnet-4-20250514-v1:0`). To use a different Bedrock-supported model, set:
 
 ```bash
 export BEDROCK_MODEL_ID=us.anthropic.claude-3-5-sonnet-20241022-v2:0
@@ -277,7 +277,7 @@ cd frontend && npm test
 | Problem | Cause | Fix |
 |---------|-------|-----|
 | `cdk deploy` fails with "CDKToolkit not found" | Account not bootstrapped | Run `cdk bootstrap aws://ACCOUNT/REGION` |
-| Agent returns `AccessDeniedException` | Model access not enabled | [Enable model access](https://console.aws.amazon.com/bedrock/home#/modelaccess) for Claude in your region |
+| Agent returns `AccessDeniedException` | Model access not enabled | [Enable model access](https://console.aws.amazon.com/bedrock/home#/modelaccess) for your chosen model in your region |
 | Agent returns `ResourceNotFoundException` | Model ID is deprecated/invalid | Set `BEDROCK_MODEL_ID` to an active model |
 | Pod stuck in `ImagePullBackOff` | Docker image not pushed to ECR | Build and push: `docker push $ECR_URI:latest` |
 | Pod can't reach AWS APIs | CoreDNS not running on Fargate | CDK auto-patches this; if stuck, see [EKS Fargate DNS docs](https://docs.aws.amazon.com/eks/latest/userguide/fargate.html) |
