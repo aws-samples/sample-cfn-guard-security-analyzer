@@ -104,21 +104,19 @@ rule ensure_s3_bucket_encryption when %s3_buckets !empty {
     }
 }
 
-## Output Requirements
-
-- rule_name: snake_case, prefixed with "ensure_", e.g. ensure_s3_bucket_encryption
-- guard_rule: Complete, syntactically valid Guard DSL. Every clause must have a << message >>.
-- pass_template: Minimal CFN YAML that PASSES the rule (secure configuration)
-- fail_template: Minimal CFN YAML that FAILS the rule (insecure/missing configuration)
-- Templates must be valid CloudFormation YAML with Resources section
-
 If you are unsure about the exact property structure, use the http_request tool to fetch the CloudFormation documentation and verify before generating the rule."""
 
 
+# Structured output is enforced via tool_use, not prompt engineering.
+# The Pydantic model (GuardRuleOutput) is converted to a Bedrock Converse API
+# tool specification by Strands SDK. The LLM is forced to call this tool with
+# the exact schema — guaranteeing the output shape. The system prompt above
+# teaches DOMAIN KNOWLEDGE (Guard DSL syntax), not output format.
 guard_rule_agent = Agent(
     system_prompt=SYSTEM_PROMPT,
     tools=[http_request],
-    model=os.environ.get("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
+    model=os.environ.get("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0"),
+    structured_output_model=GuardRuleOutput,
 )
 
 
@@ -158,16 +156,16 @@ Recommendation: {recommendation}
 
 Generate a comprehensive Guard rule that enforces the secure configuration for this property."""
 
-    # Primary path: structured output via Pydantic
-    try:
-        result = guard_rule_agent(
-            user_message,
-            structured_output_model=GuardRuleOutput
-        )
-        output = result.structured_output
-    except (TypeError, AttributeError):
-        # Fallback: parse JSON from text response
-        result = guard_rule_agent(user_message)
+    # Structured output is enforced at the Agent level via tool_use.
+    # Strands SDK converts GuardRuleOutput → Bedrock tool spec → forces
+    # the LLM to call it with the exact schema. result.structured_output
+    # is a validated Pydantic instance, not parsed text.
+    result = guard_rule_agent(user_message)
+    output = result.structured_output
+
+    if output is None:
+        # Fallback: if structured output wasn't returned (SDK version mismatch),
+        # extract JSON from text response
         text = str(result)
         match = re.search(r'\{[\s\S]*\}', text)
         parsed = json.loads(match.group(0)) if match else {}
