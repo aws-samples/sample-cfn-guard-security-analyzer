@@ -6,9 +6,9 @@ An AI-powered tool that analyzes AWS CloudFormation resource configurations for 
 
 ## What It Does
 
-[CloudFormation Guard](https://github.com/aws-cloudformation/cloudformation-guard) lets you enforce security policies on CloudFormation templates before deployment — but writing custom Guard rules for every resource property is manual, time-consuming, and requires deep knowledge of both Guard DSL syntax and each resource's security implications.
+[CloudFormation Guard](https://github.com/aws-cloudformation/cloudformation-guard) enforces security policies on CloudFormation templates before deployment. AWS provides an [open-source Guard Rules Registry](https://github.com/aws-cloudformation/aws-guard-rules-registry) with hundreds of managed rule sets mapped to AWS Config rules. However, not all resource properties are covered — new services launch frequently, security best practices evolve, and organizations often need custom rules tailored to their specific compliance requirements.
 
-This tool automates the entire process using AI agents:
+This tool complements the existing Guard ecosystem by using AI agents to automatically generate custom Guard rules where they don't yet exist:
 
 1. **Scan** any CloudFormation resource documentation and identify every security-relevant property
 2. **Assess** each property's risk level (CRITICAL / HIGH / MEDIUM / LOW) with specific threat descriptions
