@@ -22,14 +22,15 @@ echo "Directory: $AGENTS_DIR"
 echo ""
 
 # Agent definitions: name:entrypoint
-AGENT_NAMES=("cfn_security_analyzer" "cfn_crawler" "cfn_property_analyzer")
-AGENT_FILES=("security_analyzer_agent.py" "crawler_agent.py" "property_analyzer_agent.py")
+AGENT_NAMES=("cfn_security_analyzer" "cfn_crawler" "cfn_property_analyzer" "cfn_guard_rule_generator")
+AGENT_FILES=("security_analyzer_agent.py" "crawler_agent.py" "property_analyzer_agent.py" "guard_rule_generator_agent.py")
 
 SA_ARN=""
 CRAWLER_ARN=""
 PA_ARN=""
+GR_ARN=""
 
-for i in 0 1 2; do
+for i in 0 1 2 3; do
     NAME="${AGENT_NAMES[$i]}"
     ENTRYPOINT="${AGENT_FILES[$i]}"
 
@@ -56,6 +57,7 @@ for i in 0 1 2; do
         0) SA_ARN="$ARN" ;;
         1) CRAWLER_ARN="$ARN" ;;
         2) PA_ARN="$ARN" ;;
+        3) GR_ARN="$ARN" ;;
     esac
 done
 
@@ -66,3 +68,4 @@ echo ""
 echo "export SECURITY_ANALYZER_AGENT_ARN=\"$SA_ARN\""
 echo "export CRAWLER_AGENT_ARN=\"$CRAWLER_ARN\""
 echo "export PROPERTY_ANALYZER_AGENT_ARN=\"$PA_ARN\""
+echo "export GUARD_RULE_AGENT_ARN=\"$GR_ARN\""

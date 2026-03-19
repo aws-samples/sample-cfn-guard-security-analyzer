@@ -380,6 +380,10 @@ class EksStack(Stack):
                                         "name": "PROPERTY_ANALYZER_AGENT_ARN",
                                         "value": os.environ.get("PROPERTY_ANALYZER_AGENT_ARN", ""),
                                     },
+                                    {
+                                        "name": "GUARD_RULE_AGENT_ARN",
+                                        "value": os.environ.get("GUARD_RULE_AGENT_ARN", ""),
+                                    },
                                 ],
                             }
                         ],
