@@ -23,6 +23,8 @@ export interface UseAnalysisReturn {
   progressMessage: string;
   activityLog: ActivityLogEntry[];
   error: string | null;
+  resourceUrl: string | null;
+  resourceType: string | null;
   analysisType: AnalysisType;
   startAnalysis: (url: string, type: AnalysisType) => Promise<void>;
   resetAnalysis: () => void;
@@ -31,13 +33,14 @@ export interface UseAnalysisReturn {
 // --- Reducer ---
 
 type Action =
-  | { type: "START"; analysisType: AnalysisType }
+  | { type: "START"; analysisType: AnalysisType; resourceUrl: string }
   | { type: "SET_ANALYSIS_ID"; analysisId: string }
   | { type: "ADD_RESULT"; property: PropertyData }
   | { type: "SET_PROGRESS"; progress: number; message: string }
   | { type: "ADD_LOG"; entry: ActivityLogEntry }
   | { type: "COMPLETE"; results?: PropertyData[] }
   | { type: "FAIL"; error: string }
+  | { type: "SET_RESOURCE_TYPE"; resourceType: string }
   | { type: "RESET" };
 
 const initialState: AnalysisState = {
@@ -49,6 +52,8 @@ const initialState: AnalysisState = {
   progressMessage: "",
   activityLog: [],
   error: null,
+  resourceUrl: null,
+  resourceType: null,
 };
 
 function analysisReducer(state: AnalysisState, action: Action): AnalysisState {
@@ -58,6 +63,7 @@ function analysisReducer(state: AnalysisState, action: Action): AnalysisState {
         ...initialState,
         status: "in_progress",
         analysisType: action.analysisType,
+        resourceUrl: action.resourceUrl,
       };
     case "SET_ANALYSIS_ID":
       return { ...state, analysisId: action.analysisId };
@@ -84,6 +90,8 @@ function analysisReducer(state: AnalysisState, action: Action): AnalysisState {
       };
     case "FAIL":
       return { ...state, status: "failed", error: action.error };
+    case "SET_RESOURCE_TYPE":
+      return { ...state, resourceType: action.resourceType };
     case "RESET":
       return initialState;
     default:
@@ -154,8 +162,11 @@ export function useAnalysis(): UseAnalysisReturn {
           ),
         });
       },
-      onComplete: (totalProperties: number) => {
+      onComplete: (totalProperties: number, resourceType?: string) => {
         dispatch({ type: "COMPLETE" });
+        if (resourceType) {
+          dispatch({ type: "SET_RESOURCE_TYPE", resourceType });
+        }
         dispatch({
           type: "ADD_LOG",
           entry: logEntry(
@@ -251,7 +262,7 @@ export function useAnalysis(): UseAnalysisReturn {
    */
   const startAnalysis = useCallback(
     async (url: string, type: AnalysisType) => {
-      dispatch({ type: "START", analysisType: type });
+      dispatch({ type: "START", analysisType: type, resourceUrl: url });
 
       if (type === "quick") {
         await startStream(url);
@@ -318,6 +329,8 @@ export function useAnalysis(): UseAnalysisReturn {
     progressMessage: state.progressMessage,
     activityLog: state.activityLog,
     error: state.error,
+    resourceUrl: state.resourceUrl,
+    resourceType: state.resourceType,
     analysisType: state.analysisType,
     startAnalysis,
     resetAnalysis,

@@ -9,7 +9,7 @@ import { API_BASE_URL } from "../config";
 export interface UseSSEOptions {
   onStatus: (analysisId: string) => void;
   onProperty: (property: SSEPropertyEvent) => void;
-  onComplete: (totalProperties: number) => void;
+  onComplete: (totalProperties: number, resourceType?: string) => void;
   onError: (message: string) => void;
 }
 
@@ -92,8 +92,8 @@ export function routeSSEEvent(
       break;
     }
     case "complete": {
-      const d = data as { totalProperties: number };
-      options.onComplete(d.totalProperties);
+      const d = data as { totalProperties: number; resourceType?: string };
+      options.onComplete(d.totalProperties, d.resourceType);
       break;
     }
     case "error": {
@@ -140,9 +140,9 @@ export function useSSE(options: UseSSEOptions): UseSSEReturn {
           analysisIdRef.current = analysisId;
           options.onStatus(analysisId);
         },
-        onComplete: (totalProperties: number) => {
+        onComplete: (totalProperties: number, resourceType?: string) => {
           receivedTerminalEventRef.current = true;
-          options.onComplete(totalProperties);
+          options.onComplete(totalProperties, resourceType);
         },
         onError: (message: string) => {
           receivedTerminalEventRef.current = true;

@@ -28,6 +28,20 @@ export interface PropertyData {
 }
 
 /**
+ * A generated CloudFormation Guard rule.
+ */
+export interface GuardRule {
+  ruleName: string;
+  resourceType: string;
+  propertyName: string;
+  guardRule: string;
+  description: string;
+  passTemplate: string;
+  failTemplate: string;
+  riskLevel: RiskLevel;
+}
+
+/**
  * An entry in the analysis activity log.
  * Validates: Requirement 12.3
  */
@@ -51,6 +65,8 @@ export interface AnalysisState {
   progressMessage: string;
   activityLog: ActivityLogEntry[];
   error: string | null;
+  resourceUrl: string | null;
+  resourceType: string | null;
 }
 
 /**

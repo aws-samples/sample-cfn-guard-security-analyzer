@@ -342,6 +342,7 @@ async def stream_analysis(request: AnalysisRequest):
             yield sse_event("complete", {
                 "analysisId": analysis_id,
                 "totalProperties": len(properties),
+                "resourceType": agent_result.get("resourceType", "") if isinstance(agent_result, dict) else "",
             })
         except Exception as exc:
             try:
