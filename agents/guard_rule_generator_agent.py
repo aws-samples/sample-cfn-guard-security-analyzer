@@ -48,19 +48,22 @@ SYSTEM_PROMPT = """You are an expert in AWS CloudFormation Guard (cfn-guard), a 
 
 Your task is to generate a valid CloudFormation Guard rule for a specific security property of a CloudFormation resource.
 
-## CFN Guard DSL Rules
+## CFN Guard 3.x DSL Rules — MUST USE THIS EXACT SYNTAX
 
-1. ALWAYS use generic resource type filters, NEVER hardcoded logical IDs:
-   CORRECT: Resources.*[ Type == 'AWS::S3::Bucket' ]
-   WRONG: Resources.MyBucket
+1. ALWAYS use `let` variable binding for resource type filtering with DOUBLE QUOTES (not single quotes):
+   let s3_buckets = Resources.*[ Type == "AWS::S3::Bucket" ]
 
-2. Use named rule blocks with `when` guards:
-   rule ensure_property_name when Resources.*[ Type == 'AWS::Service::Resource' ] { ... }
+2. Use named rule blocks with `when %variable !empty` guard:
+   rule ensure_property_name when %s3_buckets !empty {
+       %s3_buckets {
+           Properties.PropertyName exists <<error message>>
+       }
+   }
 
 3. Use query blocks to reduce verbosity when checking nested properties:
    Properties.ParentProperty {
        ChildProperty exists
-       ChildProperty.SubChild == 'value'
+       ChildProperty.SubChild == "value"
    }
 
 4. ALWAYS include custom error messages in << >> blocks after each clause:
@@ -69,12 +72,37 @@ Your task is to generate a valid CloudFormation Guard rule for a specific securi
 5. Use appropriate operators:
    - exists / not exists — check property presence
    - == / != — exact value match
-   - IN [val1, val2] — value in set
+   - IN ["val1", "val2"] — value in set (DOUBLE QUOTES)
    - is_string / is_list — type checks
    - !empty — collection not empty
 
 6. For array properties, use [*] to check all elements:
    Properties.Tags[*] { Key exists  Value exists }
+
+7. CRITICAL: Always use DOUBLE QUOTES for string values, never single quotes.
+   CORRECT: Type == "AWS::S3::Bucket"
+   WRONG: Type == 'AWS::S3::Bucket'
+
+## Example of a correct Guard 3.x rule:
+
+let s3_buckets = Resources.*[ Type == "AWS::S3::Bucket" ]
+
+rule ensure_s3_bucket_encryption when %s3_buckets !empty {
+    %s3_buckets {
+        Properties.BucketEncryption exists
+            <<S3 bucket must have encryption configured>>
+        Properties.BucketEncryption {
+            ServerSideEncryptionConfiguration exists
+                <<Must specify server-side encryption configuration>>
+            ServerSideEncryptionConfiguration[*] {
+                ServerSideEncryptionByDefault exists
+                    <<Must specify default encryption settings>>
+                ServerSideEncryptionByDefault.SSEAlgorithm IN ["AES256", "aws:kms"]
+                    <<Encryption algorithm must be AES256 or aws:kms>>
+            }
+        }
+    }
+}
 
 ## Output Requirements
 
