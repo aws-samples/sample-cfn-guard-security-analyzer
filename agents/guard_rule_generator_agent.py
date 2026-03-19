@@ -116,8 +116,8 @@ def invoke(payload, context):
     security_implication = payload.get('securityImplication', '')
     recommendation = payload.get('recommendation', '')
 
-    if not resource_type or not property_name:
-        return {'error': 'Missing required fields: resourceType and propertyName'}
+    if not property_name:
+        return {'error': 'Missing required field: propertyName'}
 
     user_message = f"""Generate a CloudFormation Guard rule for:
 

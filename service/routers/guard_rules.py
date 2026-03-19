@@ -21,7 +21,7 @@ GUARD_RULE_AGENT_ARN = os.environ.get("GUARD_RULE_AGENT_ARN", "")
 
 
 class GuardRuleRequest(BaseModel):
-    resourceType: str
+    resourceType: str = ""
     resourceUrl: HttpUrl
     propertyName: str
     riskLevel: Literal["CRITICAL", "HIGH", "MEDIUM", "LOW"]
@@ -90,7 +90,7 @@ async def generate_guard_rule(request: GuardRuleRequest) -> GuardRuleResponse:
         result = invoke_guard_rule_agent(request)
         return GuardRuleResponse(
             ruleName=result.get("ruleName", "unknown_rule"),
-            resourceType=request.resourceType,
+            resourceType=request.resourceType or result.get("resourceType", ""),
             propertyName=request.propertyName,
             guardRule=result.get("guardRule", ""),
             description=result.get("description", ""),
