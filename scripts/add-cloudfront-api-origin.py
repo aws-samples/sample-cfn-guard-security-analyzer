@@ -7,6 +7,7 @@ This enables the workshop pattern where CloudFront is the single HTTPS entry poi
   /           → S3 (frontend)
   /health     → ALB (backend)
   /analysis/* → ALB (backend)
+  /reports/*  → ALB (backend)
   /ws         → ALB (backend WebSocket)
 """
 import json
@@ -64,7 +65,7 @@ def main():
     # Clone the default behavior as a template (has all required fields)
     import copy
     default_behavior = config["DefaultCacheBehavior"]
-    api_patterns = ["/health", "/analysis", "/analysis/*", "/callbacks/*", "/ws", "/docs", "/openapi.json"]
+    api_patterns = ["/health", "/analysis", "/analysis/*", "/callbacks/*", "/reports/*", "/ws", "/docs", "/openapi.json"]
 
     # Remove existing API behaviors (idempotent)
     existing_behaviors = config.get("CacheBehaviors", {"Quantity": 0, "Items": []})

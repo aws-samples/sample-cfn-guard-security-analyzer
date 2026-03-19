@@ -47,6 +47,16 @@ User → Frontend → FastAPI (SSE) → Bedrock AgentCore (Claude)
 3. Progress streams to the frontend via WebSocket in real-time
 4. Results are aggregated and a PDF report is generated
 
+## Demo
+
+![CFN Security Analyzer — Quick Scan and Detailed Analysis](docs/demo-screenshots/demo-full-walkthrough.gif)
+
+The walkthrough above shows:
+1. **Enter a CloudFormation resource URL** — paste any TemplateReference documentation link
+2. **Quick Scan results** — 8 security properties identified in ~15 seconds, each with risk level (Critical/High/Medium/Low), security impact, and remediation recommendation
+3. **Detailed Analysis in progress** — multi-agent pipeline with real-time progress tracking (crawl → per-property deep analysis)
+4. **Detailed Analysis results** — 12 properties found (more granular than Quick Scan), with a **Generate PDF Report** button for downloadable security reports
+
 ## Example Output
 
 ```

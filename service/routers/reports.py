@@ -145,9 +145,12 @@ def generate_pdf_report(analysis_data: dict) -> BytesIO:
     elements.append(metadata_table)
     elements.append(Spacer(1, 0.3 * inch))
 
-    # Results / properties section
+    # Results / properties section.
+    # The agent stores raw responses in DynamoDB — use parse_properties()
+    # to extract the structured properties array from various response shapes.
+    from service.routers.analysis import parse_properties
     results = analysis_data.get("results", {})
-    properties = results.get("properties", [])
+    properties = parse_properties(results)
 
     risk_groups: dict[str, list] = {
         "CRITICAL": [],
@@ -190,9 +193,9 @@ def generate_pdf_report(analysis_data: dict) -> BytesIO:
 
             for prop in props:
                 prop_data = [
-                    ["Property:", prop.get("propertyName", "Unknown")],
+                    ["Property:", prop.get("name", prop.get("propertyName", "Unknown"))],
                     ["Risk Level:", prop.get("riskLevel", "N/A")],
-                    ["Description:", prop.get("description", "No description available")],
+                    ["Security Impact:", prop.get("securityImplication", prop.get("description", "N/A"))],
                     ["Recommendation:", prop.get("recommendation", "No recommendation available")],
                 ]
                 prop_table = Table(prop_data, colWidths=[1.5 * inch, 5 * inch])
