@@ -229,7 +229,7 @@ describe("useSSE — Property Tests", () => {
         routeSSEEvent(event, options);
 
         expect(options.onComplete).toHaveBeenCalledOnce();
-        expect(options.onComplete).toHaveBeenCalledWith(totalProperties);
+        expect(options.onComplete).toHaveBeenCalledWith(totalProperties, undefined);
         expect(options.onStatus).not.toHaveBeenCalled();
         expect(options.onProperty).not.toHaveBeenCalled();
         expect(options.onError).not.toHaveBeenCalled();

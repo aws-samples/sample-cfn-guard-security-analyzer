@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import type { GuardRule, PropertyData, RiskLevel } from "../types";
+import type { GuardRule, PropertyData } from "../types";
 import { API_BASE_URL } from "../config";
 
 export interface UseGuardRulesReturn {
