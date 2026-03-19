@@ -41,20 +41,7 @@ export default function PropertyCard({
       header={
         <Header
           variant="h3"
-          actions={
-            <SpaceBetween direction="horizontal" size="xs">
-              {onGenerateGuardRule && (
-                <Button
-                  variant="icon"
-                  iconName="script"
-                  loading={generating}
-                  onClick={() => onGenerateGuardRule(property)}
-                  ariaLabel={`Generate Guard Rule for ${property.name}`}
-                />
-              )}
-              <Badge color={badgeColor}>{property.risk_level}</Badge>
-            </SpaceBetween>
-          }
+          actions={<Badge color={badgeColor}>{property.risk_level}</Badge>}
         >
           {property.name}
         </Header>
@@ -88,6 +75,16 @@ export default function PropertyCard({
               <Box>{recommendation}</Box>
             )}
           </div>
+        )}
+
+        {onGenerateGuardRule && (
+          <Button
+            iconName="script"
+            loading={generating}
+            onClick={() => onGenerateGuardRule(property)}
+          >
+            Generate Guard Rule
+          </Button>
         )}
       </SpaceBetween>
     </Container>
