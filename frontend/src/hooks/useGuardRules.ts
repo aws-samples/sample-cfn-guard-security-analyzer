@@ -54,7 +54,7 @@ export function useGuardRules(): UseGuardRulesReturn {
       setError(null);
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30_000);
+      const timeout = setTimeout(() => controller.abort(), 60_000);
 
       try {
         const resp = await fetch(`${API_BASE_URL}/guard-rules`, {
@@ -86,7 +86,7 @@ export function useGuardRules(): UseGuardRulesReturn {
       } catch (err: unknown) {
         const msg =
           err instanceof DOMException && err.name === "AbortError"
-            ? "Guard rule generation timed out (30s)"
+            ? "Guard rule generation timed out (60s)"
             : (err as Error).message;
         setError(msg);
       } finally {

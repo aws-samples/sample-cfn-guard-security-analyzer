@@ -21,7 +21,7 @@ This tool uses AI agents to automatically:
 
 | Service | Purpose |
 |---------|---------|
-| **Amazon Bedrock AgentCore** | Hosts the 3 AI agents (Strands SDK + Claude) |
+| **Amazon Bedrock AgentCore** | Hosts the 4 AI agents (Strands SDK + Claude) |
 | **Amazon EKS Fargate** | Runs the FastAPI backend service |
 | **AWS Step Functions** | Orchestrates the detailed multi-agent analysis workflow |
 | **AWS Lambda** | Invokes AgentCore agents from Step Functions |
@@ -47,6 +47,17 @@ User → Frontend → FastAPI (SSE) → Bedrock AgentCore (Claude)
 3. Progress streams to the frontend via WebSocket in real-time
 4. Results are aggregated and a PDF report is generated
 
+**Guard Rule Generation (per property)** — Click "Generate Guard Rule" on any property card:
+
+```
+PropertyCard → FastAPI (POST /guard-rules) → Guard Rule Generator Agent (Claude)
+                                                      ↓
+                              ← Structured output (Pydantic) with validated schema ←
+                              ← Guard rule + pass/fail test templates ←
+```
+
+The Guard Rule Generator Agent uses [Strands SDK structured output](https://strandsagents.com/docs/user-guide/concepts/agents/structured-output/) to guarantee the response schema via tool_use enforcement — not prompt engineering. Generated rules use **cfn-guard 3.x syntax** and are validated to work with `cfn-guard validate`.
+
 ## Demo
 
 ![CFN Security Analyzer — Quick Scan and Detailed Analysis](docs/demo-screenshots/demo-full-walkthrough.gif)
@@ -54,8 +65,9 @@ User → Frontend → FastAPI (SSE) → Bedrock AgentCore (Claude)
 The walkthrough above shows:
 1. **Enter a CloudFormation resource URL** — paste any TemplateReference documentation link
 2. **Quick Scan results** — 8 security properties identified in ~15 seconds, each with risk level (Critical/High/Medium/Low), security impact, and remediation recommendation
-3. **Detailed Analysis in progress** — multi-agent pipeline with real-time progress tracking (crawl → per-property deep analysis)
-4. **Detailed Analysis results** — 12 properties found (more granular than Quick Scan), with a **Generate PDF Report** button for downloadable security reports
+3. **Generate Guard Rule** — click the button on any property to generate a cfn-guard 3.x rule with pass/fail test templates
+4. **Guard Rules collection** — add rules to a collection tab, download all as a `.guard` ruleset file ready for CI/CD
+5. **Detailed Analysis** — multi-agent pipeline with real-time progress tracking and PDF report generation
 
 ## Example Output
 
@@ -193,7 +205,8 @@ See [`.env.example`](.env.example) for the full list. Key variables:
 | `CDK_ENVIRONMENT` | Environment name | `dev` |
 | `CDK_ADMIN_USERNAME` | IAM user for EKS kubectl access | (none) |
 | `BEDROCK_MODEL_ID` | Foundation model ID for agents | Claude Sonnet 4 |
-| `SECURITY_ANALYZER_AGENT_ARN` | AgentCore runtime ARN | (set after agent deploy) |
+| `SECURITY_ANALYZER_AGENT_ARN` | AgentCore runtime ARN (security scan) | (set after agent deploy) |
+| `GUARD_RULE_AGENT_ARN` | AgentCore runtime ARN (guard rule gen) | (set after agent deploy) |
 | `CORS_ORIGINS` | Allowed CORS origins (comma-separated) | `localhost` |
 
 ## Project Structure
@@ -219,12 +232,14 @@ See [`.env.example`](.env.example) for the full list. Key variables:
 │       ├── analysis.py             #   POST /analysis, POST /analysis/stream
 │       ├── reports.py              #   POST /reports/{id} (PDF generation)
 │       ├── websocket.py            #   WebSocket connect/subscribe
+│       ├── guard_rules.py          #   POST /guard-rules (Guard rule generation)
 │       ├── callbacks.py            #   POST /callbacks/progress
 │       └── health.py               #   GET /health
 ├── agents/                         # Bedrock AgentCore agents (Strands SDK)
 │   ├── security_analyzer_agent.py  #   Quick security scan agent
 │   ├── crawler_agent.py            #   Documentation crawler agent
-│   └── property_analyzer_agent.py  #   Detailed property analysis agent
+│   ├── property_analyzer_agent.py  #   Detailed property analysis agent
+│   └── guard_rule_generator_agent.py # Guard rule generation (structured output)
 ├── lambda/                         # Lambda handlers (used by Step Functions)
 │   ├── agent_invoker.py            #   Invokes AgentCore agents
 │   └── progress_notifier.py        #   Sends progress updates to FastAPI
@@ -242,6 +257,7 @@ See [`.env.example`](.env.example) for the full list. Key variables:
 | `POST` | `/analysis/stream` | Quick scan with SSE streaming |
 | `GET` | `/analysis/{id}` | Get analysis status and results |
 | `POST` | `/reports/{id}` | Generate PDF security report |
+| `POST` | `/guard-rules` | Generate CFN Guard rule for a property |
 | `WS` | `/ws` | WebSocket for real-time progress |
 | `POST` | `/callbacks/progress` | Step Functions progress callback |
 | `GET` | `/health` | Health check |
@@ -280,6 +296,7 @@ CDK_ENVIRONMENT=dev cdk destroy --all
 agentcore destroy --agent cfn_security_analyzer --force
 agentcore destroy --agent cfn_crawler --force
 agentcore destroy --agent cfn_property_analyzer --force
+agentcore destroy --agent cfn_guard_rule_generator --force
 ```
 
 ## Security
