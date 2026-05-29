@@ -1,0 +1,236 @@
+<mxfile host="app.diagrams.net" modified="2026-05-25T00:00:00.000Z" agent="cfn-security-analyzer" version="24.0.0">
+  <diagram name="Architecture" id="cfn-arch">
+    <mxGraphModel dx="1800" dy="1100" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title" value="CloudFormation Guard Security Analyzer" style="text;html=1;align=center;fontSize=20;fontStyle=1;fontColor=#0F172A;" vertex="1" parent="1">
+          <mxGeometry x="500" y="20" width="700" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ====================== TOP ROW: User -> CloudFront -> SPA -> API Gateway -> Orchestrator ====================== -->
+
+        <!-- User -->
+        <mxCell id="user" value="User" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#232F3E;strokeColor=#232F3E;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.user;" vertex="1" parent="1">
+          <mxGeometry x="60" y="280" width="78" height="78" as="geometry" />
+        </mxCell>
+
+        <!-- CloudFront -->
+        <mxCell id="cf" value="CloudFront&#10;(CDN)" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#945DF2;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudfront;" vertex="1" parent="1">
+          <mxGeometry x="220" y="290" width="60" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- React SPA (S3) -->
+        <mxCell id="spa" value="React SPA&#10;Cloudscape UI" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#7AA116;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;" vertex="1" parent="1">
+          <mxGeometry x="380" y="290" width="60" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- API Gateway -->
+        <mxCell id="api" value="API Gateway&#10;REST + WebSocket" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#945DF2;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.api_gateway;" vertex="1" parent="1">
+          <mxGeometry x="540" y="290" width="60" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Orchestrator + Async Workers (Lambda) -->
+        <mxCell id="orch" value="Orchestrator +&#10;Async Workers" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" vertex="1" parent="1">
+          <mxGeometry x="720" y="290" width="60" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- ====================== MIDDLE ROW: Step Functions -> Agent Invoker ====================== -->
+
+        <!-- Step Functions -->
+        <mxCell id="sfn" value="Step Functions&#10;(Detailed Analysis)" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.step_functions;" vertex="1" parent="1">
+          <mxGeometry x="900" y="540" width="60" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Agent Invoker (Lambda) -->
+        <mxCell id="invoker" value="Agent&#10;Invoker" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="540" width="60" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- ====================== RIGHT: Bedrock AgentCore swim-lane ====================== -->
+
+        <mxCell id="agent_swimlane" value="Bedrock AgentCore — 4 AI Agents" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#CBD5E1;fontSize=14;fontStyle=1;verticalAlign=top;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="120" width="380" height="700" as="geometry" />
+        </mxCell>
+
+        <!-- Security Analyzer -->
+        <mxCell id="sec" value="Security&#10;Analyzer" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#01A88D;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;" vertex="1" parent="1">
+          <mxGeometry x="1330" y="180" width="60" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Guard Rule Generator -->
+        <mxCell id="guard" value="Guard Rule&#10;Generator" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#01A88D;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;" vertex="1" parent="1">
+          <mxGeometry x="1330" y="340" width="60" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Property Analyzer -->
+        <mxCell id="prop" value="Property&#10;Analyzer" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#01A88D;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="180" width="60" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Documentation Crawler -->
+        <mxCell id="crawler" value="Documentation&#10;Crawler" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#01A88D;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="340" width="60" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- ====================== BOTTOM ROW: DynamoDB, PDF Reports, CloudWatch ====================== -->
+
+        <!-- DynamoDB -->
+        <mxCell id="ddb" value="Analysis State,&#10;Cache, Connections" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#3334B9;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;" vertex="1" parent="1">
+          <mxGeometry x="900" y="780" width="60" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- PDF Reports (S3) -->
+        <mxCell id="reports" value="PDF Security&#10;Reports" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#7AA116;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;" vertex="1" parent="1">
+          <mxGeometry x="720" y="780" width="60" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- CloudWatch -->
+        <mxCell id="cw" value="CloudWatch&#10;Metrics + Logs" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudwatch;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="780" width="60" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- ====================== EDGES (orthogonal, right-angled) ====================== -->
+
+        <!-- User -> CloudFront -->
+        <mxCell id="e_user_cf" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#555555;startArrow=none;endArrow=classic;endFill=1;" edge="1" parent="1" source="user" target="cf">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- CloudFront -> SPA -->
+        <mxCell id="e_cf_spa" value="static" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#555555;endArrow=classic;endFill=1;" edge="1" parent="1" source="cf" target="spa">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- SPA -> API Gateway (HTTPS / WSS) -->
+        <mxCell id="e_spa_api" value="HTTPS / WSS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#555555;endArrow=classic;endFill=1;" edge="1" parent="1" source="spa" target="api">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- API -> Orchestrator -->
+        <mxCell id="e_api_orch" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#555555;endArrow=classic;endFill=1;" edge="1" parent="1" source="api" target="orch">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Orchestrator -> Security Analyzer (quick / batch — blue).
+             Exits high (y=0.2) and rises in its own channel at x=1230 so it
+             never runs co-linear with the green/purple edges. -->
+        <mxCell id="e_orch_sec" value="quick / batch" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=1;exitY=0.2;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#1F77B4;strokeWidth=2;endArrow=classic;endFill=1;fontColor=#1F77B4;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="orch" target="sec">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1230" y="302" />
+              <mxPoint x="1230" y="210" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Orchestrator -> Guard Rule Generator (green). Mid exit, channel x=1185. -->
+        <mxCell id="e_orch_guard" value="guard-rules" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#2CA02C;strokeWidth=2;endArrow=classic;endFill=1;fontColor=#2CA02C;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="orch" target="guard">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1185" y="320" />
+              <mxPoint x="1185" y="370" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Orchestrator -> Documentation Crawler (discover — purple). Low exit,
+             channel x=1140 then routes below the Guard Rule Generator and enters
+             the Crawler from the bottom — keeps it clear of the green edge. -->
+        <mxCell id="e_orch_crawler" value="discover" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=1;exitY=0.8;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;strokeColor=#9467BD;strokeWidth=2;endArrow=classic;endFill=1;fontColor=#9467BD;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="orch" target="crawler">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1140" y="338" />
+              <mxPoint x="1140" y="510" />
+              <mxPoint x="1530" y="510" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Orchestrator -> Step Functions (detailed) -->
+        <mxCell id="e_orch_sfn" value="detailed" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#555555;endArrow=classic;endFill=1;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="orch" target="sfn">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="750" y="450" />
+              <mxPoint x="930" y="450" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Step Functions -> Agent Invoker -->
+        <mxCell id="e_sfn_inv" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#555555;endArrow=classic;endFill=1;" edge="1" parent="1" source="sfn" target="invoker">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Agent Invoker -> Property Analyzer (detailed: one call per property).
+             Exits high, wraps up the far-right channel (x=1690) and enters from
+             the right so it stays distinct from the crawl-step edge. -->
+        <mxCell id="e_inv_prop" value="per-property" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=1;exitY=0.35;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#555555;endArrow=classic;endFill=1;fontColor=#555555;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="invoker" target="prop">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1690" y="561" />
+              <mxPoint x="1690" y="210" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Agent Invoker -> Documentation Crawler (detailed: crawl step).
+             Wraps up the inner-right channel (x=1620) and enters from the right.
+             Crawler's other caller (discover) enters from the bottom, so the two
+             never collide. -->
+        <mxCell id="e_inv_crawler" value="crawl step" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=1;exitY=0.65;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#555555;endArrow=classic;endFill=1;fontColor=#555555;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="invoker" target="crawler">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1620" y="579" />
+              <mxPoint x="1620" y="370" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Orchestrator -> PDF Reports (dotted). Straight down — Reports sits
+             directly below the Orchestrator. -->
+        <mxCell id="e_orch_reports" value="PDF" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#555555;dashed=1;dashPattern=1 4;endArrow=classic;endFill=1;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="orch" target="reports">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Orchestrator -> DynamoDB (state, dotted). Own channel at x=840. -->
+        <mxCell id="e_orch_ddb" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=0.7;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#555555;dashed=1;dashPattern=1 4;endArrow=classic;endFill=1;" edge="1" parent="1" source="orch" target="ddb">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="846" y="730" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Step Functions -> DynamoDB (dotted). DDB is directly below SFN. -->
+        <mxCell id="e_sfn_ddb" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#555555;dashed=1;dashPattern=1 4;endArrow=classic;endFill=1;" edge="1" parent="1" source="sfn" target="ddb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- PDF Reports -> User (presigned URL, dashed) -->
+        <mxCell id="e_reports_user" value="presigned URL" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;strokeColor=#555555;dashed=1;dashPattern=8 4;endArrow=classic;endFill=1;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="reports" target="user">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Agent Invoker -> CloudWatch (dotted). CloudWatch is directly below
+             the Agent Invoker; the detailed flow's telemetry lands here. -->
+        <mxCell id="e_inv_cw" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#999999;dashed=1;dashPattern=1 4;endArrow=classic;endFill=1;" edge="1" parent="1" source="invoker" target="cw">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Orchestrator -> CloudWatch (dotted). Own channel at x=864. -->
+        <mxCell id="e_orch_cw" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=0.85;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#999999;dashed=1;dashPattern=1 4;endArrow=classic;endFill=1;" edge="1" parent="1" source="orch" target="cw">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="864" y="700" />
+              <mxPoint x="864" y="810" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
