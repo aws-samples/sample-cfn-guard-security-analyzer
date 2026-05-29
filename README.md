@@ -19,8 +19,6 @@ This tool complements the existing Guard ecosystem by using AI agents to automat
 
 ![Architecture Diagram](docs/architecture.png)
 
-> **TODO:** regenerate `docs/architecture.png` to reflect the Lambda + API Gateway architecture. The existing diagram shows the EKS variant.
-
 | Service | Purpose |
 |---------|---------|
 | **Amazon Bedrock AgentCore** | Hosts the 4 AI agents (Strands Agents SDK) |
