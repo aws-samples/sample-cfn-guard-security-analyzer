@@ -1,0 +1,14 @@
+cdk-nag (AwsSolutionsChecks) scan evidence
+Date: 2026-05-29 12:04 UTC
+Command: cdk synth (AwsSolutionsChecks Aspect runs at synthesis)
+Result: EXIT 0, 7 templates synthesized, ZERO unsuppressed findings.
+Suppressions (with rationale) live in cdk_nag_suppressions.py.
+
+Stacks synthesized:
+CfnSecurityAnalyzer-Agents-dev.template.json
+CfnSecurityAnalyzer-Api-dev.template.json
+CfnSecurityAnalyzer-Database-dev.template.json
+CfnSecurityAnalyzer-Lambda-dev.template.json
+CfnSecurityAnalyzer-Monitoring-dev.template.json
+CfnSecurityAnalyzer-StepFunctions-dev.template.json
+CfnSecurityAnalyzer-Storage-dev.template.json
