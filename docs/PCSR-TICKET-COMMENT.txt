@@ -1,0 +1,40 @@
+PCSR Delta Review Request — Serverless re-platform of an already-published aws-samples repo
+
+Repository: https://github.com/aws-samples/sample-cfn-guard-security-analyzer
+Internal source: gitlab.aws.dev (sanitized clean copy prepared for publish)
+
+Summary
+This repo was previously published and PCSR-approved with an Amazon EKS Fargate + FastAPI architecture. I am submitting a delta review for a full re-platform of the same sample to serverless (API Gateway + Lambda + Step Functions + Bedrock AgentCore + DynamoDB + S3/CloudFront). The application purpose, inputs (public AWS CloudFormation documentation URLs), and outputs (security property analysis, Guard rules, PDF report) are unchanged. The compute tier, public API, and IAM model are replaced, which is why I am filing this as a security-impacting delta rather than a routine content update.
+
+What changed (EKS to serverless)
+- Compute: EKS Fargate/FastAPI pods to AWS Lambda handlers + async workers
+- Public API: ALB/FastAPI SSE to API Gateway REST + WebSocket
+- Authorization: IRSA to Lambda execution roles + Step Functions role; bedrock-agentcore:InvokeAgentRuntime scoped to agent-name prefixes
+- State: DynamoDB (6 tables: analysis state, cache, ws-connections, guard-rules, discoveries, batches)
+- Removed: k8s/, service/ (FastAPI), eks_stack.py, uvicorn Dockerfile
+- Unchanged: the four Bedrock AgentCore agents, the SSRF allowlist, public-doc-only scope, no authentication, no customer data
+
+Security posture
+- No authentication by design (reads only public AWS docs, stores no customer data) — same as the reviewed EKS version
+- SSRF allowlist: resourceUrl hostname must be docs.aws.amazon.com; defence-in-depth filter strips off-allowlist URLs from agent output
+- Least-privilege IAM: InvokeAgentRuntime scoped to project agent-name prefixes, not wildcard ARNs
+- Encryption at rest on all DynamoDB tables; S3 enforces TLS; presigned report URLs are short-lived (1h)
+- Wildcard CORS on the REST API is an accepted sample-code tradeoff: the API is unauthenticated and uses no cookies or credentials, so wildcard CORS does not expose a credentialed session. README documents scoping origins for production.
+- cdk-nag (AwsSolutionsChecks) runs as a synth-time Aspect; findings are fixed or carry explicit NagSuppressions rationale (no blanket suppressions)
+
+Threat model
+Full STRIDE model attached (AWS Threat Composer JSON + readable markdown). 8 threats, each linked to a mitigation: API-flood DoS (throttling + reserved concurrency), Bedrock cost amplification (cache + dedup), SSRF (allowlist + output filter), prompt injection (structured output + advisory disclaimer, residual risk accepted), wildcard CORS (no credentials), presigned URL reuse (short TTL + SSL), InvokeAgentRuntime privilege misuse (prefix scoping), WebSocket abuse (TTL cleanup + per-analysisId subscription).
+
+Scan evidence
+- Frontend npm audit (prod deps): 0 vulnerabilities
+- Python dependencies: no repo-pinned vulnerable packages; all direct-dependency licenses are MIT-0-compatible (Apache-2.0, MIT, BSD-3-Clause). No GPL/AGPL/MPL.
+- Backend unit tests: 91 passed
+- Holmes (HolmesContentSecurityReviewBaselinePolicy) and Probe results to be attached from the portals.
+
+Sanitization
+- Live API Gateway endpoints removed from frontend config (replaced with Vite env vars + placeholders)
+- Verified zero real account IDs, live endpoint IDs, internal domains, personal aliases, or AI-authorship strings
+- Excluded AgentCore local state, cdk.out, build artifacts, and transcripts from the published tree
+
+Residual risk
+Accepted residual risks consistent with educational sample code carrying a not-for-production disclaimer: prompt injection from crawled public docs (low; advisory output), unauthenticated API abuse (bounded by throttling + cache; no data at risk), wildcard CORS (no credentials in play). All documented in the README production-hardening guidance.
