@@ -19,6 +19,8 @@ This tool complements the existing Guard ecosystem by using AI agents to automat
 
 ![Architecture Diagram](docs/architecture.png)
 
+*Figure 1: CloudFormation Guard Security Analyzer — Serverless Architecture*
+
 | Service | Purpose |
 |---------|---------|
 | **Amazon Bedrock AgentCore** | Hosts the 4 AI agents (Strands Agents SDK) |
@@ -48,7 +50,7 @@ PropertyCard → API Gateway (POST /guard-rules) → Lambda → Guard Rule Gener
                                   ← Guard rule + pass/fail test templates ←
 ```
 
-The Guard Rule Generator uses [Strands SDK structured output](https://strandsagents.com/docs/user-guide/concepts/agents/structured-output/) to guarantee valid cfn-guard 3.x rules via tool_use schema enforcement. Each rule includes pass/fail CloudFormation templates for local validation with `cfn-guard validate`.
+The Guard Rule Generator uses [Strands SDK structured output](https://strandsagents.com/docs/user-guide/concepts/agents/structured-output/) designed to produce valid cfn-guard 3.x rules via tool_use schema enforcement. Each rule includes pass/fail CloudFormation templates for local validation with `cfn-guard validate`.
 
 **Optional: Detailed Analysis (2-5 minutes)** — For deeper analysis, the multi-agent workflow via Step Functions:
 
@@ -351,9 +353,19 @@ agentcore destroy --agent cfn_crawler --force
 agentcore destroy --agent cfn_property_analyzer --force
 ```
 
-## Security
+## Security Considerations
 
-See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for reporting security issues.
+This is educational sample code and is **not production-ready as-is**. Review and harden the following before any production use:
+
+- **Authentication** — The API has no authentication by design, so the sample is easy to try. For production, front the API with Amazon Cognito (or an equivalent authorizer) and require authenticated requests.
+- **CORS** — The REST API uses a wildcard `Access-Control-Allow-Origin: *`. This is acceptable here because the API is unauthenticated and uses no cookies or credentials, so no credentialed session is exposed. For production, scope the allowed origins to your frontend domain.
+- **SSRF protection** — The crawler only fetches from an allowlisted host (`docs.aws.amazon.com`). A defence-in-depth filter additionally strips any off-allowlist URLs from agent output. Keep the allowlist as tight as your use case permits.
+- **Report URLs** — PDF reports are delivered via short-lived S3 presigned URLs (1-hour expiry) and the bucket enforces TLS (`aws:SecureTransport` deny). Treat presigned URLs as sensitive and avoid logging or sharing them.
+- **IAM** — Lambda and Step Functions roles scope `bedrock-agentcore:InvokeAgentRuntime` to this project's agent-name prefixes rather than wildcard ARNs. Keep IAM least-privilege when extending the sample.
+- **Prompt-injection residual risk** — Agents read public AWS documentation, which could in principle contain prompt-injection content. Output is advisory and structurally constrained (Pydantic schema). This residual risk is accepted for an educational sample; validate agent output before acting on it in any automated pipeline.
+- **Encryption** — All DynamoDB tables are encrypted at rest.
+
+Reporting: see [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for reporting security issues.
 
 ## License
 

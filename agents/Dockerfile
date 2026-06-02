@@ -27,7 +27,8 @@ RUN uv tool install awslabs.aws-documentation-mcp-server@latest && \
     uv tool install awslabs.aws-iac-mcp-server@latest
 
 # Strip build tools to keep the image lean — the installed CLIs are now binaries.
-RUN apt-get purge -y gcc build-essential && apt-get autoremove -y
+RUN apt-get purge -y gcc build-essential && apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
 
 # Python deps: bedrock-agentcore + strands + mcp client + pydantic.
 COPY requirements.txt .
@@ -36,6 +37,11 @@ RUN uv pip install --system --no-cache -r requirements.txt
 # Copy all agent source files. agentcore CLI will set the actual CMD per-agent
 # at deploy time via --entrypoint flag.
 COPY . .
+
+# Run as a non-root user (least privilege). Create the user after the build
+# steps that need root, and own the app directory so the agent can read its code.
+RUN useradd -m appuser && chown -R appuser /app
+USER appuser
 
 EXPOSE 8080
 
