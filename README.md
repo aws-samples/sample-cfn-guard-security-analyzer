@@ -2,7 +2,15 @@
 
 > **Important:** This is sample code for demonstration and educational purposes only. It is not intended for production use without further review and hardening. You should work with your security and legal teams to meet your organizational security, regulatory, and compliance requirements before deployment.
 
-An AI-powered tool that reads AWS CloudFormation resource documentation, identifies security-critical configuration properties, and generates custom [CloudFormation Guard](https://github.com/aws-cloudformation/cloudformation-guard) rules for security hardening. Point it at any CloudFormation resource documentation URL — it assesses risk levels, provides hardening recommendations, and generates ready-to-use Guard rules you can plug into your CI/CD pipeline. Powered by [Amazon Bedrock AgentCore](https://docs.aws.amazon.com/bedrock/latest/userguide/agentcore.html).
+Organizations in regulated industries must meet strict compliance and security requirements before allowlisting new AWS services. Cloud and Security teams responsible for onboarding typically spend hours manually analyzing service documentation, CloudFormation resource specs, and threat models to determine the right guardrails (e.g., blocking S3 public access, enforcing encryption). This manual analysis creates onboarding delays and inconsistent coverage.
+
+This AI Agent automates that work. Point it at any CloudFormation resource documentation URL and it will:
+
+- Identify security-critical configuration properties
+- Assess risk levels with hardening recommendations
+- Generate ready-to-use [CloudFormation Guard](https://github.com/aws-cloudformation/cloudformation-guard) rules that you can plug directly into your CI/CD pipeline
+
+Powered by [Amazon Bedrock AgentCore](https://docs.aws.amazon.com/bedrock/latest/userguide/agentcore.html).
 
 ## What It Does
 
@@ -211,7 +219,7 @@ Cache writes are best-effort: a DynamoDB failure logs an error but does not fail
 
 ### MCP Servers in Agents
 
-Each AgentCore agent uses two AWS Labs MCP servers as stdio subprocesses, replacing ad-hoc HTML scraping via `http_request`:
+Each AgentCore agent uses two AWS Labs MCP servers:
 
 | MCP Server | Tools | Used By |
 |---|---|---|
@@ -315,7 +323,7 @@ curl -X POST "$API_BASE_URL/analysis/quick" \
   -d '{"resourceUrl":"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-s3-bucket.html"}'
 ```
 
-`cdk synth` runs `AwsSolutionsChecks` from `cdk-nag` on every stack. Findings are either fixed in the relevant stack or suppressed in `cdk_nag_suppressions.py` with an explicit rationale string.
+`cdk synth` runs `AwsSolutionsChecks` from `cdk-nag` on every stack. Findings are either fixed in the relevant stack or suppressed in `cdk_nag_suppressions.py` with an explicit rationale string. 
 
 ## Troubleshooting
 
