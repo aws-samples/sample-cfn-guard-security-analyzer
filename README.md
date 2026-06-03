@@ -2,7 +2,7 @@
 
 > **Important:** This is sample code for demonstration and educational purposes only. It is not intended for production use without further review and hardening. You should work with your security and legal teams to meet your organizational security, regulatory, and compliance requirements before deployment.
  
-"**Problem:** Organizations in regulated industries have to often meet strict compliance and security requirements before allowlisting new AWS services for enterprise use. Cloud and Security teams responsible for onboarding typically spend hours manually analyzing service documentation, CloudFormation resource specs, and threat models to determine the right guardrails (e.g., blocking S3 public access, enforcing encryption). This manual analysis creates onboarding delays and inconsistent coverage.
+**Problem:** Organizations in regulated industries have to often meet strict compliance and security requirements before allowlisting new AWS services for enterprise use. Cloud and Security teams responsible for onboarding typically spend hours manually analyzing service documentation, CloudFormation resource specs, and threat models to determine the right guardrails (e.g., blocking S3 public access, enforcing encryption). This manual analysis creates onboarding delays and inconsistent coverage.
 
 **Solution:** This AI Agent automates that work. Point it at any CloudFormation resource documentation URL and it will:
 
