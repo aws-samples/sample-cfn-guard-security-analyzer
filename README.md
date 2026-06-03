@@ -1,13 +1,13 @@
 # CloudFormation Guard Security Analyzer
 
 > **Important:** This is sample code for demonstration and educational purposes only. It is not intended for production use without further review and hardening. You should work with your security and legal teams to meet your organizational security, regulatory, and compliance requirements before deployment.
+ 
+"**Problem:** Organizations in regulated industries must meet strict compliance and security requirements before allowlisting new AWS services. Cloud and Security teams responsible for onboarding typically spend hours manually analyzing service documentation, CloudFormation resource specs, and threat models to determine the right guardrails (e.g., blocking S3 public access, enforcing encryption). This manual analysis creates onboarding delays and inconsistent coverage.
 
-Organizations in regulated industries must meet strict compliance and security requirements before allowlisting new AWS services. Cloud and Security teams responsible for onboarding typically spend hours manually analyzing service documentation, CloudFormation resource specs, and threat models to determine the right guardrails (e.g., blocking S3 public access, enforcing encryption). This manual analysis creates onboarding delays and inconsistent coverage.
-
-This AI Agent automates that work. Point it at any CloudFormation resource documentation URL and it will:
+**Solution:** This AI Agent automates that work. Point it at any CloudFormation resource documentation URL and it will:
 
 - Identify security-critical configuration properties
-- Assess risk levels with hardening recommendations
+- Assess risk levels with hardening recommendations using AWS MCP Servers for documentation and IaC review.
 - Generate ready-to-use [CloudFormation Guard](https://github.com/aws-cloudformation/cloudformation-guard) rules that you can plug directly into your CI/CD pipeline
 
 Powered by [Amazon Bedrock AgentCore](https://docs.aws.amazon.com/bedrock/latest/userguide/agentcore.html).
