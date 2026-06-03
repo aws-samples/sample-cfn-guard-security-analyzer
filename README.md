@@ -317,19 +317,6 @@ curl -X POST "$API_BASE_URL/analysis/quick" \
 
 `cdk synth` runs `AwsSolutionsChecks` from `cdk-nag` on every stack. Findings are either fixed in the relevant stack or suppressed in `cdk_nag_suppressions.py` with an explicit rationale string.
 
-## Cost
-
-| Component | Idle cost | Per-analysis cost |
-|---|---|---|
-| Bedrock AgentCore agents | $0 | dominated by Bedrock model inference |
-| Lambda + API Gateway | $0 (free tier eligible) | sub-cent per request |
-| DynamoDB (PAY_PER_REQUEST) | $0 | sub-cent per analysis |
-| S3 + CloudFront | minimal (storage + CDN) | minimal |
-
-A detailed analysis on Claude Opus 4.7 typically costs **$0.50–$2** depending on resource size (more properties means more parallel agent invocations). Quick scans are cheaper (single-agent invocation, ~$0.05–$0.20). Cached results return without invoking the model — analyses repeat for free within the 30-day cache TTL.
-
-To cut inference cost, set `BEDROCK_MODEL_ID` to `us.anthropic.claude-sonnet-4-6` (cheaper Sonnet tier) before running `deploy.sh`.
-
 ## Troubleshooting
 
 | Problem | Cause | Fix |
