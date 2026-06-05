@@ -14,6 +14,7 @@ import ResourceSelector, {
 } from "./components/ResourceSelector";
 import BatchResultsSection from "./components/BatchResultsSection";
 import BatchProgressSection from "./components/BatchProgressSection";
+import DiscoverProgressSection from "./components/DiscoverProgressSection";
 
 /**
  * Root application component.
@@ -34,15 +35,36 @@ function App() {
   const discover = useDiscover();
   const [selectedNames, setSelectedNames] = useState<string[]>([]);
 
+  // Wipe EVERY result surface before starting any new search. The app renders
+  // three independent result stores — single-analysis (`analysis.results`),
+  // batch (`analysis.batchResponse`), and discovery (`discover.resources`) —
+  // and previously each flow only cleared its own. That left a prior detailed
+  // scan stacked under a fresh discover/batch, so the user couldn't tell which
+  // result was current. Clearing all three on every entry point keeps exactly
+  // one flow visible at a time. (A "minimize to resume" history feature can
+  // layer on top later; this is the correctness fix.)
+  const resetAllFlows = useCallback(() => {
+    analysis.resetAnalysis();
+    analysis.clearBatch();
+    discover.clear();
+    setSelectedNames([]);
+  }, [analysis, discover]);
+
   const onDiscover = useCallback(
     async (url: string) => {
-      // Reset everything tied to the previous flow before starting a new one.
-      analysis.clearBatch();
-      setSelectedNames([]);
+      resetAllFlows();
       await discover.discover(url);
     },
-    [analysis, discover],
+    [discover, resetAllFlows],
   );
+
+  // Refresh re-runs discovery against the same index URL with the cache
+  // bypass. Keeps the current resource list visible until the fresh crawl
+  // lands (discover() resets resources itself on start).
+  const onRefreshDiscover = useCallback(() => {
+    if (!discover.sourceUrl) return;
+    void discover.discover(discover.sourceUrl, true);
+  }, [discover]);
 
   const onToggle = useCallback((name: string) => {
     setSelectedNames((prev) =>
@@ -59,15 +81,41 @@ function App() {
   const onAnalyzeBatch = useCallback(
     async (urls: string[]) => {
       if (urls.length === 0 || urls.length > MAX_BATCH) return;
+      // Clear any leftover single-analysis result so it doesn't render beneath
+      // the batch results. Keep discover.resources (the selector) — the batch
+      // is launched FROM that selection, so the list must stay.
+      analysis.resetAnalysis();
       await analysis.analyzeBatch(urls);
     },
     [analysis],
+  );
+
+  // Single-resource analysis is triggered from InputSection directly. Wrap it
+  // so a fresh single scan also clears any prior batch/discovery results
+  // (e.g. user discovered a service, then pasted a single resource URL).
+  const onSingleAnalyze = useCallback(
+    (url: string, type: Parameters<typeof analysis.startAnalysis>[1]) => {
+      analysis.clearBatch();
+      discover.clear();
+      setSelectedNames([]);
+      void analysis.startAnalysis(url, type);
+    },
+    [analysis, discover],
   );
 
   // The "in flight" sense for InputSection: any of the discovery /
   // selection / batch-analysis steps is in progress.
   const inMultiResourceFlow =
     discover.status === "discovering" || analysis.batchAnalyzing;
+
+  // Global busy flag: ANY analysis in flight — single/detailed scan, discovery
+  // crawl, or batch run. Only one analysis may run at a time, so every entry
+  // point (single Start, Discover, batch Analyze) is disabled while this is
+  // true. Prevents the conflict where a single scan and a batch run overlap.
+  const anyRunning =
+    analysis.status === "in_progress" ||
+    analysis.batchAnalyzing ||
+    discover.status === "discovering";
 
   // Show ResourceSelector once discovery succeeded and we haven't yet got
   // a batch response. Once batch results are in, switch to the results view.
@@ -85,8 +133,9 @@ function App() {
         <SpaceBetween size="l">
           <InputSection
             analysis={analysis}
+            onAnalyze={onSingleAnalyze}
             onDiscover={onDiscover}
-            busy={inMultiResourceFlow}
+            busy={anyRunning}
           />
 
           {discover.status === "error" && discover.error && (
@@ -115,6 +164,13 @@ function App() {
             />
           )}
 
+          {discover.status === "discovering" && (
+            <DiscoverProgressSection
+              discovering
+              sourceUrl={discover.sourceUrl}
+            />
+          )}
+
           {showSelector && (
             <ResourceSelector
               resources={discover.resources}
@@ -124,6 +180,9 @@ function App() {
               onClearSelection={onClearSelection}
               onAnalyzeBatch={onAnalyzeBatch}
               analyzing={analysis.batchAnalyzing}
+              onRefresh={onRefreshDiscover}
+              cached={discover.cached}
+              cachedAt={discover.cachedAt}
             />
           )}
 
@@ -138,12 +197,23 @@ function App() {
             <BatchResultsSection response={analysis.batchResponse} />
           )}
 
-          {analysis.status === "in_progress" && (
-            <ProgressSection analysis={analysis} />
-          )}
-          {analysis.results.length > 0 && (
-            <ResultsSection analysis={analysis} />
-          )}
+          {/* Single-resource progress/results are hidden whenever a
+              multi-resource (discover/batch) flow is active or has results, so
+              the two result surfaces are mutually exclusive on screen even
+              mid-transition. resetAllFlows() already clears state on a new
+              search; this guard is the belt-and-suspenders render gate. */}
+          {!inMultiResourceFlow &&
+            discover.status === "idle" &&
+            !analysis.batchResponse &&
+            analysis.status === "in_progress" && (
+              <ProgressSection analysis={analysis} />
+            )}
+          {!inMultiResourceFlow &&
+            discover.status === "idle" &&
+            !analysis.batchResponse &&
+            analysis.results.length > 0 && (
+              <ResultsSection analysis={analysis} />
+            )}
         </SpaceBetween>
       }
       navigationHide

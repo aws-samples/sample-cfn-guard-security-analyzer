@@ -57,6 +57,12 @@ const SAMPLE_URLS: ReadonlyArray<{
 
 interface InputSectionProps {
   analysis: UseAnalysisReturn;
+  /**
+   * Triggered when the user submits a single-resource URL. App wraps this to
+   * clear any prior batch/discovery results before starting, so only the
+   * current result shows. Falls back to `analysis.startAnalysis` if absent.
+   */
+  onAnalyze?: (url: string, type: AnalysisType) => void;
   /** Phase 6: triggered when the user submits an index URL. */
   onDiscover?: (url: string) => void;
   /** True while a discover or batch flow is in progress. */
@@ -85,6 +91,7 @@ export function validateUrl(url: string): boolean {
  */
 export default function InputSection({
   analysis,
+  onAnalyze,
   onDiscover,
   busy = false,
 }: InputSectionProps) {
@@ -111,7 +118,11 @@ export default function InputSection({
       return;
     }
 
-    analysis.startAnalysis(url, analysisType);
+    if (onAnalyze) {
+      onAnalyze(url, analysisType);
+    } else {
+      void analysis.startAnalysis(url, analysisType);
+    }
   };
 
   return (

@@ -52,6 +52,14 @@ class DatabaseStack(Stack):
             table_name=f"cfn-security-batches-{self.config.environment_name}",
             partition_key_name="batchId",
         )
+
+        # Detailed-analysis per-property results. The Step Functions Map writes
+        # one item per property here (PK analysisId, SK propertyName) instead of
+        # carrying every property's full analysis through SF state — that blob
+        # exceeds the 256 KB state-payload limit for large resources (e.g. S3's
+        # 25 verbose properties). The GET-by-id path reassembles results.properties
+        # by querying this table on analysisId.
+        self.property_results_table = self._create_property_results_table()
     
     def _create_analysis_table(self) -> dynamodb.Table:
         """Create DynamoDB table for storing analysis state and results.
@@ -193,6 +201,42 @@ class DatabaseStack(Stack):
             table_name=table_name,
             partition_key=dynamodb.Attribute(
                 name=partition_key_name,
+                type=dynamodb.AttributeType.STRING,
+            ),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.RETAIN if self.config.environment_name == "prod" else RemovalPolicy.DESTROY,
+            point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
+                point_in_time_recovery_enabled=self.config.environment_name == "prod"
+            ),
+            time_to_live_attribute="ttl",
+        )
+
+    def _create_property_results_table(self) -> dynamodb.Table:
+        """Per-property detailed-analysis results (PK analysisId, SK propertyName).
+
+        The detailed Step Functions workflow writes one item per analyzed
+        property here so the per-property analysis text never has to transit a
+        single SF state (capped at 256 KB, which overflows for large resources
+        such as S3's 25 verbose properties). The orchestrator GET-by-id path
+        queries this table by analysisId to reassemble results.properties.
+
+        Schema:
+            analysisId    - PK
+            propertyName  - SK
+            <analysis fields: riskLevel, securityImplications, recommendations,
+             commonMisconfigurations, bestPractices, relatedProperties>
+            ttl           - epoch seconds (30-day retention, matches analysis)
+        """
+        return dynamodb.Table(
+            self,
+            "PropertyResultsTable",
+            table_name=f"cfn-security-property-results-{self.config.environment_name}",
+            partition_key=dynamodb.Attribute(
+                name="analysisId",
+                type=dynamodb.AttributeType.STRING,
+            ),
+            sort_key=dynamodb.Attribute(
+                name="propertyName",
                 type=dynamodb.AttributeType.STRING,
             ),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,

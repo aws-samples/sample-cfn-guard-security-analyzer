@@ -18,8 +18,15 @@ export interface UseDiscoverReturn {
   error: string | null;
   /** The index URL the most recent discover call ran against. */
   sourceUrl: string | null;
-  /** Trigger discovery for a CFN service-index URL. */
-  discover: (url: string) => Promise<void>;
+  /** True when the most recent result came from the discovery cache. */
+  cached: boolean;
+  /** ISO timestamp the cached list was originally written, or null. */
+  cachedAt: string | null;
+  /**
+   * Trigger discovery for a CFN service-index URL. Pass `refresh=true` to
+   * bypass the discovery cache and force a fresh crawl (Refresh button).
+   */
+  discover: (url: string, refresh?: boolean) => Promise<void>;
   /** Reset back to idle (clears resources + error). */
   clear: () => void;
 }
@@ -56,18 +63,23 @@ export function useDiscover(): UseDiscoverReturn {
   const [resources, setResources] = useState<DiscoveredResource[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
+  const [cached, setCached] = useState(false);
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
 
-  const discover = useCallback(async (url: string) => {
+  const discover = useCallback(async (url: string, refresh?: boolean) => {
     setStatus("discovering");
     setError(null);
     setResources([]);
     setSourceUrl(url);
+    setCached(false);
+    setCachedAt(null);
+    const refreshSuffix = refresh ? "?refresh=true" : "";
 
     // Phase 8 async pattern: POST returns 202 + discoveryId, then we poll
     // GET /analysis/discover/{discoveryId} until COMPLETED or FAILED. Up to
     // 5 min total (matches the worker Lambda's 15-min cap with margin).
     try {
-      const resp = await fetch(`${API_BASE_URL}/analysis/discover`, {
+      const resp = await fetch(`${API_BASE_URL}/analysis/discover${refreshSuffix}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resourceUrl: url }),
@@ -96,6 +108,8 @@ export function useDiscover(): UseDiscoverReturn {
       type DiscoverJob = {
         status: string;
         result?: { resources?: DiscoveredResource[] };
+        cached?: boolean;
+        cached_at?: string | null;
         error?: string;
       };
 
@@ -112,6 +126,11 @@ export function useDiscover(): UseDiscoverReturn {
         ? (finalState.result!.resources as DiscoveredResource[])
         : [];
       setResources(list);
+      // A cache hit is recorded on the discoveries row (cached + cached_at);
+      // the POST may also have signalled it directly. Surface either so the UI
+      // can badge "Cached" next to the Refresh button.
+      setCached(Boolean(finalState.cached ?? dispatched.cached));
+      setCachedAt(finalState.cached_at ?? null);
       setStatus("ready");
     } catch (err: unknown) {
       const msg =
@@ -130,7 +149,9 @@ export function useDiscover(): UseDiscoverReturn {
     setResources([]);
     setError(null);
     setSourceUrl(null);
+    setCached(false);
+    setCachedAt(null);
   }, []);
 
-  return { status, resources, error, sourceUrl, discover, clear };
+  return { status, resources, error, sourceUrl, cached, cachedAt, discover, clear };
 }

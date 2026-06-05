@@ -39,6 +39,7 @@ class LambdaStack(Stack):
         guard_rules_table,
         discoveries_table,
         batches_table,
+        property_results_table,
         reports_bucket: s3.IBucket,
         **kwargs,
     ):
@@ -51,6 +52,7 @@ class LambdaStack(Stack):
         self.guard_rules_table = guard_rules_table
         self.discoveries_table = discoveries_table
         self.batches_table = batches_table
+        self.property_results_table = property_results_table
         self.reports_bucket = reports_bucket
 
         self.log_retention = _RETENTION_MAP.get(
@@ -113,6 +115,9 @@ class LambdaStack(Stack):
             environment={
                 "ANALYSIS_TABLE_NAME": self.analysis_table.table_name,
                 "CACHE_TABLE_NAME": self.cache_table.table_name,
+                # Detailed-analysis per-property results live here; GET-by-id
+                # reassembles results.properties from this table.
+                "PROPERTY_RESULTS_TABLE_NAME": self.property_results_table.table_name,
                 "ENVIRONMENT": self.config.environment_name,
                 # Cache key includes the model ID so a model swap doesn't return
                 # stale results from the prior model. Default mirrors agents/.
@@ -227,6 +232,11 @@ class LambdaStack(Stack):
                 "CRAWLER_AGENT_ARN": "",
                 # Phase 8 async pattern: handler -> PENDING row -> worker.
                 "DISCOVERIES_TABLE_NAME": self.discoveries_table.table_name,
+                # Discovery results are cached here (key "discover:<url>") with
+                # the same 30-day TTL as analyses. The handler returns a cached
+                # COMPLETED record without dispatching the crawler worker.
+                "CACHE_TABLE_NAME": self.cache_table.table_name,
+                "BEDROCK_MODEL_ID": "us.anthropic.claude-opus-4-7",
             },
             log_retention=self.log_retention,
             tracing=lambda_.Tracing.ACTIVE if self.config.enable_xray else lambda_.Tracing.DISABLED,
@@ -344,6 +354,11 @@ class LambdaStack(Stack):
                 "DISCOVERIES_TABLE_NAME": self.discoveries_table.table_name,
                 # Populated by scripts/post-deploy.sh after the agent runtime is created.
                 "CRAWLER_AGENT_ARN": "",
+                # After a successful crawl, the worker writes the resource list
+                # to the cache table (key "discover:<url>") so repeat discovers
+                # of the same index page skip the slow crawl.
+                "CACHE_TABLE_NAME": self.cache_table.table_name,
+                "BEDROCK_MODEL_ID": "us.anthropic.claude-opus-4-7",
             },
             log_retention=self.log_retention,
             tracing=lambda_.Tracing.ACTIVE if self.config.enable_xray else lambda_.Tracing.DISABLED,
@@ -375,6 +390,8 @@ class LambdaStack(Stack):
 
     def _grant_dynamodb_permissions(self) -> None:
         self.analysis_table.grant_read_write_data(self.orchestrator_function)
+        # GET-by-id reassembles detailed results by querying the per-property table.
+        self.property_results_table.grant_read_data(self.orchestrator_function)
         self.connection_table.grant_read_write_data(self.websocket_function)
         self.analysis_table.grant_read_data(self.websocket_function)
         # Report generator updates the analysis row with the report URL/S3 key
@@ -402,6 +419,10 @@ class LambdaStack(Stack):
         self.guard_rules_table.grant_read_write_data(self.guard_rules_worker_function)
         self.discoveries_table.grant_read_write_data(self.discover_function)
         self.discoveries_table.grant_read_write_data(self.discover_worker_function)
+        # Discovery caching: handler reads cached resource lists, worker writes
+        # them after a successful crawl (key "discover:<url>", 30-day TTL).
+        self.cache_table.grant_read_data(self.discover_function)
+        self.cache_table.grant_write_data(self.discover_worker_function)
         self.batches_table.grant_read_write_data(self.batch_function)
         self.batches_table.grant_read_write_data(self.batch_worker_function)
         # Batch worker also needs R/W on analysis + cache (per-URL records).

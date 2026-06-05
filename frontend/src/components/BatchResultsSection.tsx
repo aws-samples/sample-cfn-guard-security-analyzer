@@ -1,3 +1,4 @@
+import { useState } from "react";
 import Container from "@cloudscape-design/components/container";
 import Header from "@cloudscape-design/components/header";
 import Badge from "@cloudscape-design/components/badge";
@@ -7,9 +8,19 @@ import KeyValuePairs from "@cloudscape-design/components/key-value-pairs";
 import SpaceBetween from "@cloudscape-design/components/space-between";
 import StatusIndicator from "@cloudscape-design/components/status-indicator";
 import Alert from "@cloudscape-design/components/alert";
+import Flashbar from "@cloudscape-design/components/flashbar";
+import SegmentedControl from "@cloudscape-design/components/segmented-control";
 import type { BatchAnalysisResponse } from "../hooks/useAnalysis";
 import type { PropertyData, RiskLevel } from "../types";
+import { useGuardRules } from "../hooks/useGuardRules";
+import {
+  computeSeverityCounts,
+  filterByRiskLevel,
+  type FilterLevel,
+} from "./ResultsSection";
+import { formatCachedLabel } from "../utils/formatCachedLabel";
 import PropertyCard from "./PropertyCard";
+import GuardRuleModal from "./GuardRuleModal";
 
 interface BatchResultsSectionProps {
   response: BatchAnalysisResponse;
@@ -100,6 +111,27 @@ export default function BatchResultsSection({
     return sum + (Array.isArray(props) ? props.length : 0);
   }, 0);
 
+  // Guard-rule generation, identical to the single-resource ResultsSection so
+  // every flow (quick, detailed, batch/discover) offers the same per-property
+  // "Generate Guard Rule" action. Each batch resource carries its own URL +
+  // type, so we resolve them per group before calling generateRule.
+  const guardRules = useGuardRules();
+
+  // Invert urlToKey (submission URL -> result key) so a result key maps back to
+  // its source documentation URL, which guard-rule generation requires.
+  const keyToUrl: Record<string, string> = {};
+  for (const [url, key] of Object.entries(response.urlToKey ?? {})) {
+    keyToUrl[key] = url;
+  }
+
+  const handleGenerateGuardRule = (
+    property: PropertyData,
+    resourceUrl: string,
+    resourceType: string,
+  ) => {
+    guardRules.generateRule(property, resourceUrl, resourceType);
+  };
+
   return (
     <Container
       header={
@@ -113,6 +145,16 @@ export default function BatchResultsSection({
       }
     >
       <SpaceBetween size="l">
+        {guardRules.error && (
+          <Flashbar
+            items={[{
+              type: "error",
+              content: guardRules.error,
+              dismissible: true,
+              onDismiss: () => guardRules.clearError(),
+            }]}
+          />
+        )}
         <KeyValuePairs
           columns={4}
           items={[
@@ -161,6 +203,11 @@ export default function BatchResultsSection({
               ? (entry.results.properties as unknown[])
               : [];
             const coercedProps = props.map(coerceProperty);
+            // Resolve this resource's source URL + CFN type for guard-rule
+            // generation. resourceType comes from the analysis payload; the URL
+            // from the inverted urlToKey map (fallback: the result key itself).
+            const resourceUrl = keyToUrl[key] ?? "";
+            const resourceType = String(entry.results?.resourceType ?? key);
 
             return (
               <ExpandableSection
@@ -170,31 +217,110 @@ export default function BatchResultsSection({
                 headerActions={
                   entry.cached ? (
                     <StatusIndicator type="info">
-                      Cached{entry.cached_at ? ` (${entry.cached_at})` : ""}
+                      {formatCachedLabel(entry.cached_at)}
                     </StatusIndicator>
                   ) : undefined
                 }
               >
-                {coercedProps.length === 0 ? (
-                  <Box variant="p" color="inherit">
-                    No properties returned for this resource.
-                  </Box>
-                ) : (
-                  <SpaceBetween size="s">
-                    {coercedProps.map((p, i) => (
-                      <PropertyCard
-                        key={`${key}-${p.name}-${i}`}
-                        property={p}
-                        index={i}
-                      />
-                    ))}
-                  </SpaceBetween>
-                )}
+                <BatchResourcePanel
+                  resourceKey={key}
+                  properties={coercedProps}
+                  onGenerateGuardRule={(prop) =>
+                    handleGenerateGuardRule(prop, resourceUrl, resourceType)
+                  }
+                  generatingName={guardRules.generating}
+                />
               </ExpandableSection>
             );
           })
         )}
       </SpaceBetween>
+
+      <GuardRuleModal
+        rule={guardRules.modalRule}
+        onDismiss={guardRules.closeModal}
+        onAddToCollection={(rule) => {
+          guardRules.addToCollection(rule);
+          guardRules.closeModal();
+        }}
+      />
     </Container>
+  );
+}
+
+const SEVERITY_BADGE: Record<RiskLevel, "red" | "grey" | "blue" | "green"> =
+  BADGE_COLOR;
+
+/**
+ * One resource's property list inside a batch result, with the SAME
+ * All/Critical/High/Medium/Low severity filter as the single-resource
+ * ResultsSection. Each resource owns its own filter state so filtering one
+ * resource doesn't affect the others. This keeps the batch UI consistent with
+ * single-scan instead of dumping every property in one flat list.
+ */
+function BatchResourcePanel({
+  resourceKey,
+  properties,
+  onGenerateGuardRule,
+  generatingName,
+}: {
+  resourceKey: string;
+  properties: PropertyData[];
+  onGenerateGuardRule: (property: PropertyData) => void;
+  generatingName: string | null;
+}) {
+  const [filterLevel, setFilterLevel] = useState<FilterLevel>("ALL");
+
+  if (properties.length === 0) {
+    return (
+      <Box variant="p" color="inherit">
+        No properties returned for this resource.
+      </Box>
+    );
+  }
+
+  const counts = computeSeverityCounts(properties);
+  const filtered = filterByRiskLevel(properties, filterLevel);
+
+  return (
+    <SpaceBetween size="m">
+      <KeyValuePairs
+        columns={4}
+        items={[
+          { label: "Critical", value: <Badge color={SEVERITY_BADGE.CRITICAL}>{counts.CRITICAL}</Badge> },
+          { label: "High", value: <Badge color={SEVERITY_BADGE.HIGH}>{counts.HIGH}</Badge> },
+          { label: "Medium", value: <Badge color={SEVERITY_BADGE.MEDIUM}>{counts.MEDIUM}</Badge> },
+          { label: "Low", value: <Badge color={SEVERITY_BADGE.LOW}>{counts.LOW}</Badge> },
+        ]}
+      />
+      <SegmentedControl
+        selectedId={filterLevel}
+        onChange={({ detail }) => setFilterLevel(detail.selectedId as FilterLevel)}
+        options={[
+          { id: "ALL", text: "All" },
+          { id: "CRITICAL", text: "Critical" },
+          { id: "HIGH", text: "High" },
+          { id: "MEDIUM", text: "Medium" },
+          { id: "LOW", text: "Low" },
+        ]}
+      />
+      {filtered.length === 0 ? (
+        <Box variant="p" color="inherit">
+          No {filterLevel.toLowerCase()} properties for this resource.
+        </Box>
+      ) : (
+        <SpaceBetween size="s">
+          {filtered.map((p, i) => (
+            <PropertyCard
+              key={`${resourceKey}-${p.name}-${i}`}
+              property={p}
+              index={i}
+              onGenerateGuardRule={onGenerateGuardRule}
+              generating={generatingName === p.name}
+            />
+          ))}
+        </SpaceBetween>
+      )}
+    </SpaceBetween>
   );
 }

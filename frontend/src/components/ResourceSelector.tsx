@@ -7,7 +7,9 @@ import Box from "@cloudscape-design/components/box";
 import Alert from "@cloudscape-design/components/alert";
 import Checkbox from "@cloudscape-design/components/checkbox";
 import SpaceBetween from "@cloudscape-design/components/space-between";
+import Badge from "@cloudscape-design/components/badge";
 import type { DiscoveredResource } from "../hooks/useDiscover";
+import { formatCachedLabel } from "../utils/formatCachedLabel";
 
 /** Hard cap matches `MAX_URLS_PER_BATCH` in lambda/batch_handler.py. */
 export const MAX_BATCH = 5;
@@ -27,6 +29,12 @@ interface ResourceSelectorProps {
   onAnalyzeBatch: (urls: string[]) => void;
   /** True while a batch analysis is in flight; disables the submit button. */
   analyzing?: boolean;
+  /** Re-run discovery bypassing the cache (Refresh button). */
+  onRefresh?: () => void;
+  /** True when the displayed resource list came from the discovery cache. */
+  cached?: boolean;
+  /** ISO timestamp the cached list was written, shown next to the badge. */
+  cachedAt?: string | null;
 }
 
 /**
@@ -80,6 +88,9 @@ export default function ResourceSelector({
   onClearSelection,
   onAnalyzeBatch,
   analyzing = false,
+  onRefresh,
+  cached = false,
+  cachedAt = null,
 }: ResourceSelectorProps) {
   const overLimit = selectedNames.length > MAX_BATCH;
   const submitDisabled = isAnalyzeDisabled(selectedNames.length, analyzing);
@@ -112,6 +123,16 @@ export default function ResourceSelector({
           description={`Select up to ${MAX_BATCH} resources to analyze in parallel.`}
           actions={
             <SpaceBetween direction="horizontal" size="xs">
+              {onRefresh && (
+                <Button
+                  iconName="refresh"
+                  onClick={onRefresh}
+                  disabled={analyzing}
+                  ariaLabel="Refresh discovery (bypass cache)"
+                >
+                  Refresh
+                </Button>
+              )}
               <Button onClick={onSelectAll} disabled={analyzing}>
                 Select All
               </Button>
@@ -129,7 +150,12 @@ export default function ResourceSelector({
             </SpaceBetween>
           }
         >
-          Discovered Resources
+          <SpaceBetween direction="horizontal" size="xs">
+            <span>Discovered Resources</span>
+            {cached && (
+              <Badge color="grey">{formatCachedLabel(cachedAt)}</Badge>
+            )}
+          </SpaceBetween>
         </Header>
       }
     >

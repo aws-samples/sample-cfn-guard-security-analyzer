@@ -37,6 +37,7 @@ lambda_client = boto3.client('lambda')
 CRAWLER_AGENT_ARN = os.environ.get('CRAWLER_AGENT_ARN', '')
 DISCOVERIES_TABLE_NAME = os.environ.get('DISCOVERIES_TABLE_NAME', '')
 DISCOVER_WORKER_FUNCTION = os.environ.get('DISCOVER_WORKER_FUNCTION', '')
+CACHE_TABLE_NAME = os.environ.get('CACHE_TABLE_NAME', '')
 
 ASYNC_TTL_SECONDS = 7 * 24 * 60 * 60
 
@@ -45,10 +46,71 @@ ALLOWED_RESOURCE_HOSTS = frozenset({"docs.aws.amazon.com"})
 discoveries_table = (
     dynamodb.Table(DISCOVERIES_TABLE_NAME) if DISCOVERIES_TABLE_NAME else None
 )
+cache_table = dynamodb.Table(CACHE_TABLE_NAME) if CACHE_TABLE_NAME else None
 
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _discover_cache_key(resource_url: str) -> str:
+    """Cache key for a discovery result; mirrors discover_worker."""
+    return f"discover:{resource_url}"
+
+
+def _is_refresh_requested(event: Dict[str, Any]) -> bool:
+    """True when the caller passed ?refresh=true (Refresh button), forcing a
+    cache miss + re-crawl. Mirrors analysis_orchestrator semantics."""
+    qs = event.get('queryStringParameters') or {}
+    return str(qs.get('refresh', '')).lower() == 'true'
+
+
+def _get_cached_discovery(resource_url: str) -> Optional[Dict[str, Any]]:
+    """Return the cached discovery result for `resource_url`, or None on
+    miss/expiry/error. Caching is best-effort: any error falls through to a
+    normal crawl."""
+    if cache_table is None:
+        return None
+    try:
+        resp = cache_table.get_item(Key={'cacheKey': _discover_cache_key(resource_url)})
+        item = resp.get('Item')
+        if not item:
+            return None
+        ttl = int(item.get('ttl', 0))
+        if ttl and ttl < int(_now_utc().timestamp()):
+            return None
+        raw = item.get('analysis_output')
+        if raw is None:
+            return None
+        result = json.loads(raw) if isinstance(raw, str) else raw
+        if not isinstance(result, dict) or 'resources' not in result:
+            return None
+        return {'result': result, 'cached_at': item.get('cached_at')}
+    except (ClientError, json.JSONDecodeError) as e:
+        print(f"Discovery cache read error (non-fatal): {e}")
+        return None
+
+
+def _create_completed_record(
+    discovery_id: str, resource_url: str, result: Dict[str, Any], cached_at: Optional[str]
+) -> None:
+    """Write a discoveries row that is already COMPLETED with cached resources.
+    Lets a cache hit reuse the exact same GET-poll contract the frontend uses
+    for live crawls — no frontend change needed."""
+    if discoveries_table is None:
+        raise RuntimeError("DISCOVERIES_TABLE_NAME is not configured.")
+    now = _now_utc()
+    discoveries_table.put_item(Item={
+        'discoveryId': discovery_id,
+        'status': 'COMPLETED',
+        'createdAt': now.isoformat(),
+        'updatedAt': now.isoformat(),
+        'ttl': int(now.timestamp()) + ASYNC_TTL_SECONDS,
+        'resourceUrl': resource_url,
+        'result': result,
+        'cached': True,
+        'cached_at': cached_at,
+    })
 
 
 def _validate(body: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
@@ -176,6 +238,26 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         resource_url = body['resourceUrl']
         discovery_id = str(uuid.uuid4())
+
+        # Cache check: a hit (and no ?refresh=true) skips the crawler worker
+        # entirely. We still write a discoveries row — already COMPLETED with
+        # the cached resources — so the frontend's GET-poll works unchanged.
+        if not _is_refresh_requested(event):
+            cached = _get_cached_discovery(resource_url)
+            if cached is not None:
+                try:
+                    _create_completed_record(
+                        discovery_id, resource_url, cached['result'], cached.get('cached_at')
+                    )
+                    return _response(202, {
+                        'discoveryId': discovery_id,
+                        'status': 'COMPLETED',
+                        'cached': True,
+                        'message': 'Returned cached discovery (use ?refresh=true to bypass cache)',
+                    })
+                except (RuntimeError, ClientError) as e:
+                    # Cache-hit bookkeeping failed; fall through to a live crawl.
+                    print(f"Cached-discovery record write failed, falling back to crawl: {e}")
 
         try:
             _create_pending_record(discovery_id, resource_url)

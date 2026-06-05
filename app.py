@@ -53,6 +53,7 @@ lambda_stack = LambdaStack(
     guard_rules_table=database_stack.guard_rules_table,
     discoveries_table=database_stack.discoveries_table,
     batches_table=database_stack.batches_table,
+    property_results_table=database_stack.property_results_table,
     reports_bucket=storage_stack.reports_bucket,
     env=env,
 )
@@ -65,6 +66,7 @@ stepfunctions_stack = StepFunctionsStack(
     config=config,
     analysis_table=database_stack.analysis_table,
     cache_table=database_stack.cache_table,
+    property_results_table=database_stack.property_results_table,
     websocket_function=lambda_stack.websocket_function,
     env=env,
 )

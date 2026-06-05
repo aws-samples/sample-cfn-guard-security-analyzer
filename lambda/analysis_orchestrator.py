@@ -45,6 +45,13 @@ CACHE_TTL_SECONDS = 30 * 24 * 60 * 60
 
 analysis_table = dynamodb.Table(ANALYSIS_TABLE_NAME)
 cache_table = dynamodb.Table(CACHE_TABLE_NAME) if CACHE_TABLE_NAME else None
+# Detailed analyses store one item per property here (PK analysisId, SK
+# propertyName); GET-by-id reassembles results.properties from it so the heavy
+# per-property analysis never has to transit Step Functions state (256 KB cap).
+PROPERTY_RESULTS_TABLE_NAME = os.environ.get('PROPERTY_RESULTS_TABLE_NAME', '')
+property_results_table = (
+    dynamodb.Table(PROPERTY_RESULTS_TABLE_NAME) if PROPERTY_RESULTS_TABLE_NAME else None
+)
 
 
 def _now_utc() -> datetime:
@@ -103,6 +110,10 @@ def _get_cached_result(cache_key: str) -> Optional[Dict[str, Any]]:
         return {
             'analysis_output': parsed,
             'cached_at': item.get('cached_at'),
+            # Detailed cache entries record which analysis produced them so the
+            # cache-hit path can reassemble per-property results (stored in the
+            # property-results table keyed by that id). Absent for quick scans.
+            'source_analysis_id': item.get('source_analysis_id'),
         }
     except ClientError as e:
         print(f"Cache read error (non-fatal): {str(e)}")
@@ -277,6 +288,97 @@ def update_analysis_status(analysis_id: str, status: str, **kwargs) -> None:
     )
 
 
+def _query_property_results(analysis_id: str) -> list:
+    """Return the per-property analysis objects stored for `analysis_id`.
+
+    The detailed Step Functions workflow writes one DynamoDB item per property
+    (PK analysisId, SK propertyName) so the heavy text never transits a single
+    256 KB SF state. This reads them all back and parses each `analysis_output`
+    JSON string into the dict the frontend expects. Returns [] on any error or
+    when the table isn't configured (assembly is best-effort).
+    """
+    if property_results_table is None:
+        return []
+    from boto3.dynamodb.conditions import Key
+    props: list = []
+    kwargs = {'KeyConditionExpression': Key('analysisId').eq(analysis_id)}
+    while True:
+        resp = property_results_table.query(**kwargs)
+        for row in resp.get('Items', []):
+            raw = row.get('analysis_output')
+            analysis = raw
+            if isinstance(raw, str):
+                try:
+                    analysis = json.loads(raw)
+                except (json.JSONDecodeError, TypeError):
+                    analysis = {}
+            if isinstance(analysis, dict):
+                # Ensure the property name is present even if the agent omitted it.
+                analysis.setdefault('propertyName', row.get('propertyName'))
+                props.append(analysis)
+        if 'LastEvaluatedKey' in resp:
+            kwargs['ExclusiveStartKey'] = resp['LastEvaluatedKey']
+        else:
+            break
+    return props
+
+
+def _attach_detailed_properties(analysis_id: str, item: Dict[str, Any]) -> Dict[str, Any]:
+    """Reassemble results.properties for a detailed analysis from the
+    property-results table.
+
+    The detailed Step Functions workflow stores each property's analysis as a
+    separate DynamoDB item (PK analysisId, SK propertyName) so the heavy text
+    never transits a single 256 KB SF state. The stored analysis row therefore
+    has results metadata (resourceType, totalProperties) but no inline
+    `properties` array. Here we query the property-results table and rebuild the
+    array the frontend expects. No-op when properties are already present (quick
+    scan / cached) or when the table isn't configured.
+    """
+    if property_results_table is None:
+        return item
+
+    results = item.get('results')
+    # results may arrive in three shapes:
+    #   1. a native dict (quick scan / cache hit)
+    #   2. a JSON string (defensive — older writes)
+    #   3. {"S": "<json string>"} — the detailed SF path writes results via
+    #      DynamoAttributeValue.from_map({"S": from_string(json_to_string(...))}),
+    #      so that `S` key leaks into the data plane (boto3 does NOT strip it on
+    #      read because it's nested content, not a top-level type descriptor).
+    # Normalize all three to a single native dict here so callers (and the
+    # frontend) never have to know about the wrapper.
+    parsed_results = results
+    if isinstance(results, str):
+        try:
+            parsed_results = json.loads(results)
+        except (json.JSONDecodeError, TypeError):
+            return item
+    if not isinstance(parsed_results, dict):
+        return item
+    # Unwrap the leaked {"S": "<json>"} attribute wrapper from the SF write.
+    if set(parsed_results.keys()) == {'S'} and isinstance(parsed_results['S'], str):
+        try:
+            parsed_results = json.loads(parsed_results['S'])
+        except (json.JSONDecodeError, TypeError):
+            return item
+        if not isinstance(parsed_results, dict):
+            return item
+    # Already has inline properties (quick scan / cache hit) — nothing to do.
+    if parsed_results.get('properties'):
+        return item
+    # Only assemble for completed analyses.
+    if item.get('status') != 'COMPLETED':
+        return item
+
+    try:
+        parsed_results['properties'] = _query_property_results(analysis_id)
+        item['results'] = parsed_results
+    except Exception as e:  # noqa: BLE001 — assembly is best-effort
+        print(f"Could not assemble detailed properties for {analysis_id}: {e}")
+    return item
+
+
 def _response(status_code: int, body: Dict[str, Any]) -> Dict[str, Any]:
     return {
         'statusCode': status_code,
@@ -305,7 +407,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 response = analysis_table.get_item(Key={'analysisId': analysis_id})
                 if 'Item' not in response:
                     return _response(404, {'error': 'Analysis not found'})
-                return _response(200, response['Item'])
+                item = response['Item']
+                # Detailed analyses store per-property results in a separate table
+                # (to stay under the 256 KB Step Functions state limit). When the
+                # analysis is COMPLETED and its results carry no inline properties,
+                # reassemble them here by querying the property-results table.
+                item = _attach_detailed_properties(analysis_id, item)
+                return _response(200, item)
             except Exception as e:
                 print(f"Error retrieving analysis: {str(e)}")
                 return _response(500, {'error': 'Failed to retrieve analysis'})
@@ -326,24 +434,53 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if not refresh:
             cached = _get_cached_result(cache_key)
             if cached is not None:
-                analysis_id = str(uuid.uuid4())
-                create_analysis_record(
-                    analysis_id=analysis_id,
-                    resource_url=resource_url,
-                    analysis_type=analysis_type,
-                    connection_id=connection_id,
-                )
-                update_analysis_status(
-                    analysis_id, 'COMPLETED', results=cached['analysis_output']
-                )
-                return _response(200, {
-                    'analysisId': analysis_id,
-                    'status': 'COMPLETED',
-                    'results': cached['analysis_output'],
-                    'cached': True,
-                    'cached_at': cached.get('cached_at'),
-                    'message': 'Returned cached analysis (use ?refresh=true to bypass cache)',
-                })
+                cached_output = cached['analysis_output']
+                # Detailed cache entries store only slim metadata
+                # ({resourceType, totalProperties}); the per-property analyses
+                # live in the property-results table keyed by the ORIGINAL
+                # analysisId. Reassemble them here so a cache hit returns the
+                # full result the frontend renders.
+                serve_from_cache = True
+                if analysis_type == 'detailed' and isinstance(cached_output, dict) \
+                        and not cached_output.get('properties'):
+                    source_id = cached.get('source_analysis_id')
+                    props = _query_property_results(source_id) if source_id else []
+                    if props:
+                        cached_output = {**cached_output, 'properties': props}
+                    else:
+                        # Stale/unreassemblable entry: a slim detailed result
+                        # with no source_analysis_id (written before that field
+                        # existed) or whose per-property rows have expired. We
+                        # CANNOT rebuild properties, so serving this cache hit
+                        # would render an empty result (the "detailed shows
+                        # nothing" bug). Treat it as a MISS and fall through to a
+                        # fresh Step Functions run, which self-heals the entry.
+                        serve_from_cache = False
+                        print(
+                            f"Detailed cache entry for {cache_key} is slim and "
+                            f"unreassemblable (source_analysis_id="
+                            f"{cached.get('source_analysis_id')!r}); re-running."
+                        )
+
+                if serve_from_cache:
+                    analysis_id = str(uuid.uuid4())
+                    create_analysis_record(
+                        analysis_id=analysis_id,
+                        resource_url=resource_url,
+                        analysis_type=analysis_type,
+                        connection_id=connection_id,
+                    )
+                    update_analysis_status(
+                        analysis_id, 'COMPLETED', results=cached_output
+                    )
+                    return _response(200, {
+                        'analysisId': analysis_id,
+                        'status': 'COMPLETED',
+                        'results': cached_output,
+                        'cached': True,
+                        'cached_at': cached.get('cached_at'),
+                        'message': 'Returned cached analysis (use ?refresh=true to bypass cache)',
+                    })
 
         analysis_id = str(uuid.uuid4())
         create_analysis_record(

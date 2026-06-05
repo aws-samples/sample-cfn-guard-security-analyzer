@@ -22,18 +22,13 @@ interface ResultsSectionProps {
   analysis: UseAnalysisReturn;
 }
 
-/**
- * Format a "Cached" badge label using the cachedAt timestamp.
- * Exported for unit testing the cache-hit display path.
- */
-export function formatCachedLabel(cachedAt: string | null): string {
-  if (!cachedAt) return "Cached";
-  const date = new Date(cachedAt);
-  if (Number.isNaN(date.getTime())) return "Cached";
-  return `Cached ${date.toLocaleString()}`;
-}
+// Single source of truth for the cached-at badge format lives in utils so
+// single-scan, discovery, and batch all render identically. Imported for local
+// use and re-exported for the existing tests that import it from this module.
+import { formatCachedLabel } from "../utils/formatCachedLabel";
+export { formatCachedLabel };
 
-type FilterLevel = "ALL" | RiskLevel;
+export type FilterLevel = "ALL" | RiskLevel;
 
 /**
  * Compute severity counts from an array of PropertyData.

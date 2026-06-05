@@ -34,10 +34,18 @@ function normalizeProperty(raw: unknown): PropertyData {
       ? risk
       : "MEDIUM") as PropertyData["risk_level"],
     description: get("description"),
-    security_impact: get("security_impact", "securityImplication", "securityImpact"),
+    // Quick scan emits singular (securityImplication/recommendation); the
+    // detailed property_analyzer agent emits plural (securityImplications/
+    // recommendations). Accept both.
+    security_impact: get(
+      "security_impact",
+      "securityImplication",
+      "securityImplications",
+      "securityImpact",
+    ),
     key_threat: get("key_threat", "keyThreat"),
     secure_configuration: get("secure_configuration", "secureConfiguration"),
-    recommendation: get("recommendation"),
+    recommendation: get("recommendation", "recommendations"),
     property_path: get("property_path", "propertyPath"),
     best_practices: Array.isArray(r.best_practices)
       ? (r.best_practices as string[])
@@ -385,6 +393,15 @@ export function useAnalysis(): UseAnalysisReturn {
   const startAnalysis = useCallback(
     async (url: string, type: AnalysisType, refresh?: boolean) => {
       dispatch({ type: "START", analysisType: type, resourceUrl: url });
+      // Nudge the bar off 0% immediately. The time-based ramp only fires on the
+      // first poll tick (3-5 s in), so without this the bar would read a literal
+      // "0%" for the first few seconds and look stuck. A small starting value
+      // signals "started" the instant the user clicks.
+      dispatch({
+        type: "SET_PROGRESS",
+        progress: 5,
+        message: "Starting analysis...",
+      });
 
       const refreshSuffix = refresh ? "?refresh=true" : "";
 
@@ -396,10 +413,25 @@ export function useAnalysis(): UseAnalysisReturn {
       // This pattern unification side-steps API Gateway's 30 s integration
       // timeout for synchronous quick scans.
       try {
-        // Detailed analysis needs WebSocket connected first so we don't miss
-        // the early progress events. Quick scan polls and doesn't need WS.
+        // Detailed analysis uses WebSocket for LIVE progress events, but it is
+        // strictly an optimization: the poll loop below (GET /analysis/{id})
+        // independently guarantees the result appears. So a WS connect failure
+        // must NOT abort the analysis — otherwise a flaky/unwired progress
+        // socket makes the whole detailed scan "click and reset". Connect
+        // best-effort; swallow the error and fall through to POST + poll.
         if (type === "detailed") {
-          await ws.connect();
+          try {
+            await ws.connect();
+          } catch (wsErr) {
+            dispatch({
+              type: "ADD_LOG",
+              entry: logEntry(
+                "Live Updates Unavailable",
+                "Progress socket unavailable; falling back to polling for results.",
+                "info",
+              ),
+            });
+          }
         }
 
         const response = await fetch(
@@ -467,6 +499,11 @@ export function useAnalysis(): UseAnalysisReturn {
 
           const POLL_INTERVAL_MS = 3000;
           const MAX_POLL_TIME_MS = 5 * 60 * 1000;
+          // Quick scans typically finish in 30-90 s (cold start dominates).
+          // Ramp the bar toward 90% over that window so it visibly advances;
+          // only COMPLETE sets 100%.
+          const QUICK_EXPECTED_MS = 90 * 1000;
+          const QUICK_PROGRESS_CAP = 90;
           const start = Date.now();
 
           while (Date.now() - start < MAX_POLL_TIME_MS) {
@@ -509,10 +546,17 @@ export function useAnalysis(): UseAnalysisReturn {
               });
               return;
             }
-            // Update progress message so the user sees progress is happening.
+            // Time-based ramp so the bar moves instead of sitting at a static
+            // value. Approaches QUICK_PROGRESS_CAP but never reaches 100% from
+            // the ramp — only COMPLETE does.
+            const elapsed = Date.now() - start;
+            const ramped = Math.min(
+              QUICK_PROGRESS_CAP,
+              Math.floor((elapsed / QUICK_EXPECTED_MS) * QUICK_PROGRESS_CAP),
+            );
             dispatch({
               type: "SET_PROGRESS",
-              progress: 50,
+              progress: ramped,
               message: "Analyzing — this can take 30-90 seconds on cold start...",
             });
           }
@@ -523,9 +567,12 @@ export function useAnalysis(): UseAnalysisReturn {
           return;
         }
 
-        // Detailed analysis: subscribe WebSocket for progress events. The
-        // Step Functions workflow streams crawl/analyze/complete events that
-        // populate the property cards live.
+        // Detailed analysis: subscribe WebSocket for live progress events AND
+        // poll GET /analysis/{id} as a fallback. The WebSocket makes the cards
+        // populate live; the poll guarantees results still appear if any WS
+        // event is missed (e.g. the progress-notifier endpoint isn't wired, or
+        // the socket drops). This mirrors the quick-scan reliability pattern so
+        // detailed analysis never hangs while completed results sit in DynamoDB.
         ws.subscribe(analysisId);
 
         dispatch({
@@ -535,6 +582,114 @@ export function useAnalysis(): UseAnalysisReturn {
             "Initializing security analysis",
           ),
         });
+
+        // Step Functions stores `results` as a stringified JSON wrapped in a
+        // DynamoDB { "S": "..." } attribute, whereas quick scan stores a native
+        // object. Unwrap+parse both shapes before reading `.properties`.
+        const unwrapResults = (raw: unknown): { properties?: unknown[]; resourceType?: string } => {
+          if (raw && typeof raw === "object" && "S" in (raw as Record<string, unknown>)) {
+            try {
+              return JSON.parse((raw as { S: string }).S);
+            } catch {
+              return {};
+            }
+          }
+          return (raw as { properties?: unknown[]; resourceType?: string }) ?? {};
+        };
+
+        // Detailed analysis is a Step Functions Map: each element is the Map
+        // iteration context, with the per-property agent output buried at
+        // `propertyResult.Payload.result`. Flatten each element to that inner
+        // analysis object so normalizeProperty() sees the real fields. Quick
+        // scan is already flat, so elements without that nesting pass through.
+        const flattenDetailed = (items: unknown[]): unknown[] =>
+          items.map((it) => {
+            const el = it as {
+              propertyResult?: { Payload?: { result?: unknown } };
+              property?: { name?: string };
+            };
+            const inner = el?.propertyResult?.Payload?.result;
+            if (inner && typeof inner === "object") {
+              // Carry the crawler-provided name as a fallback if the analyzer
+              // omitted propertyName.
+              return { name: el.property?.name, ...(inner as object) };
+            }
+            return it;
+          });
+
+        const DETAILED_POLL_MS = 5000;
+        const DETAILED_MAX_MS = 10 * 60 * 1000; // detailed is slower (multi-agent fan-out)
+        // Time we expect a typical detailed scan to take. The bar ramps toward
+        // DETAILED_PROGRESS_CAP over this window so the user sees steady
+        // movement instead of a bar frozen at 0%. We never reach 100% from the
+        // ramp alone — only the COMPLETE action sets 100%, so a fast finish
+        // jumps to done and a slow one keeps inching forward without lying.
+        const DETAILED_EXPECTED_MS = 5 * 60 * 1000; // ~5 min for a large resource
+        const DETAILED_PROGRESS_CAP = 90;
+        const detailedStart = Date.now();
+
+        // The WebSocket "complete" handler and this poll loop both dispatch the
+        // same terminal COMPLETE/FAIL action — whichever lands first wins and
+        // the other's dispatch is a harmless idempotent repeat of the same
+        // terminal state. So the poll needs no cross-check against WS status.
+        while (Date.now() - detailedStart < DETAILED_MAX_MS) {
+          await new Promise((r) => setTimeout(r, DETAILED_POLL_MS));
+
+          // Advance the progress bar based on elapsed time. WebSocket progress
+          // events (if the socket connected) may overwrite this with real
+          // step-based values; absent those, this time-based ramp is what keeps
+          // the bar moving during the multi-minute fan-out.
+          const elapsed = Date.now() - detailedStart;
+          const ramped = Math.min(
+            DETAILED_PROGRESS_CAP,
+            Math.floor((elapsed / DETAILED_EXPECTED_MS) * DETAILED_PROGRESS_CAP),
+          );
+          dispatch({
+            type: "SET_PROGRESS",
+            progress: ramped,
+            message: "Analyzing properties — this can take a few minutes...",
+          });
+
+          let pollResp: Response;
+          try {
+            pollResp = await fetch(`${API_BASE_URL}/analysis/${analysisId}`);
+          } catch {
+            continue; // transient network error — keep polling
+          }
+          if (!pollResp.ok) continue;
+          const pollData = await pollResp.json();
+
+          if (pollData.status === "COMPLETED") {
+            const r = unwrapResults(pollData.results);
+            const flattened = flattenDetailed(
+              Array.isArray(r.properties) ? r.properties : [],
+            );
+            const properties: PropertyData[] = normalizeProperties(flattened);
+            dispatch({
+              type: "COMPLETE",
+              results: properties,
+              cached: false,
+              cachedAt: null,
+            });
+            if (r.resourceType) {
+              dispatch({ type: "SET_RESOURCE_TYPE", resourceType: r.resourceType });
+            }
+            dispatch({
+              type: "ADD_LOG",
+              entry: logEntry(
+                "Analysis Complete",
+                `Found ${properties.length} security properties`,
+                "success",
+              ),
+            });
+            return;
+          }
+          if (pollData.status === "FAILED") {
+            dispatch({ type: "FAIL", error: pollData.error || "Detailed analysis failed" });
+            return;
+          }
+        }
+        dispatch({ type: "FAIL", error: "Detailed analysis timed out after 10 minutes" });
       } catch (error: unknown) {
         dispatch({
           type: "FAIL",
