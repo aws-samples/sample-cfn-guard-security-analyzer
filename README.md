@@ -12,6 +12,28 @@
 
 Powered by [Amazon Bedrock AgentCore](https://docs.aws.amazon.com/bedrock/latest/userguide/agentcore.html).
 
+## Try it without deploying — run the analyzers in your AI IDE
+
+You don't need an AWS account, Bedrock, or a deploy to use the four analyzers. The
+[`integrations/`](integrations/) folder packages the exact same agent prompts to run
+**directly inside your AI coding tool**, using its model plus two public AWS MCP servers
+for grounded docs reads and `cfn-guard` validation. The only prerequisite is
+[`uv`/`uvx`](https://docs.astral.sh/uv/) on your `PATH` (the MCP servers run via `uvx`).
+
+- **Claude Code** → [`integrations/claude/`](integrations/claude) — install with
+  `claude --plugin-dir ./integrations/claude`, then run the `/cfn-guard-security-analyzer:cfn-analyze <service | resource type | docs URL>`
+  orchestrator (or the granular `cfn-security-scan` / `cfn-property-analysis` /
+  `cfn-guard-rule` / `cfn-crawl` commands).
+- **Kiro** → [`integrations/kiro/`](integrations/kiro) — copy the `.kiro/` folder into
+  your workspace, reference the steering doc with `#cfn-security-analyzer`, then ask in
+  plain language (e.g. *"Generate a cfn-guard rule for AWS::S3::Bucket BucketEncryption"*).
+
+Both produce identical output — a severity-ranked report plus self-validated cfn-guard
+rules with pass/fail templates, saved under `./cfn-analysis/`. See
+[`integrations/README.md`](integrations/README.md) for the full setup and the four
+analyzers. To run the full deployable service (web frontend, Step Functions
+orchestration, batch scanning), continue below.
+
 ## What It Does
 
 [CloudFormation Guard](https://github.com/aws-cloudformation/cloudformation-guard) enforces security policies on CloudFormation templates before deployment. AWS provides an [open-source Guard Rules Registry](https://github.com/aws-cloudformation/aws-guard-rules-registry) with hundreds of managed rule sets mapped to AWS Config rules. However, not all resource properties are covered — new services launch frequently, security best practices evolve, and organizations often need custom rules tailored to their specific compliance requirements.

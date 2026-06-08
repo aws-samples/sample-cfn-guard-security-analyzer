@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "cfn-guard-security-analyzer",
+  "description": "CloudFormation Guard security analysis agents, packaged as Claude Code commands with bundled AWS Documentation and AWS IaC MCP servers.",
+  "owner": {
+    "name": "CFN Guard Security Analyzer"
+  },
+  "plugins": [
+    {
+      "name": "cfn-guard-security-analyzer",
+      "source": "./",
+      "description": "Analyze the security of any AWS CloudFormation resource or service from Claude Code with no AWS account. The /cfn-analyze orchestrator lists a service's resources, produces a severity-ranked report, and generates self-validated cfn-guard rules — plus granular commands (security scan, property deep-dive, guard-rule generation, crawler). Bundles the AWS Documentation and AWS IaC MCP servers."
+    }
+  ]
+}
