@@ -99,6 +99,8 @@ The walkthrough above shows:
 3. **Generate Guard Rule** — click the button on any property to generate a cfn-guard 3.x rule with pass/fail test templates
 4. **Guard Rules collection** — add rules to a collection tab, download all as a `.guard` ruleset file ready for CI/CD
 
+You can also paste a **service index URL** (e.g. `AWS_IAM.html`) to discover every CloudFormation resource in that service, select up to 5, and batch-analyze them in parallel — each result gets the same severity filters and per-property Guard-rule generation. Discovery results are cached (with a Refresh bypass), so repeat discovers of the same service return instantly.
+
 ## Example Output
 
 ### Generated Guard Rule
