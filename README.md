@@ -99,9 +99,7 @@ The walkthrough above shows:
 3. **Severity filters** — narrow the results to Critical / High / Medium / Low
 4. **Generate Guard Rule** — click the button on any property to generate a cfn-guard 3.x rule with pass/fail test templates
 5. **Guard Rules collection** — add rules to a collection tab, download all as a `.guard` ruleset file ready for CI/CD
-6. **Discover a whole service** — paste a service index URL (e.g. `AWS_IAM.html`) to list every resource and batch-analyze up to 5 in parallel
-
-You can also paste a **service index URL** (e.g. `AWS_IAM.html`) to discover every CloudFormation resource in that service, select up to 5, and batch-analyze them in parallel — each result gets the same severity filters and per-property Guard-rule generation. Discovery results are cached (with a Refresh bypass), so repeat discovers of the same service return instantly.
+6. **Discover a whole service** — paste a service index URL (e.g. `AWS_IAM.html`) to list every resource and batch-analyze up to 5 in parallel; each result gets the same severity filters and per-property Guard-rule generation, and discovery results are cached (with a Refresh bypass)
 
 ## Example Output
 
