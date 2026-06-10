@@ -94,10 +94,12 @@ The Guard Rule Generator uses [Strands SDK structured output](https://strandsage
 ![CFN Security Analyzer — Quick Scan and Detailed Analysis](docs/demo-screenshots/demo-full-walkthrough.gif)
 
 The walkthrough above shows:
-1. **Enter a CloudFormation resource URL** — paste any TemplateReference documentation link
-2. **Quick Scan** — 8 security properties identified in ~15 seconds with risk levels and recommendations
-3. **Generate Guard Rule** — click the button on any property to generate a cfn-guard 3.x rule with pass/fail test templates
-4. **Guard Rules collection** — add rules to a collection tab, download all as a `.guard` ruleset file ready for CI/CD
+1. **Enter a CloudFormation resource URL** — paste any documentation link, or click a sample chip (S3 Bucket, IAM Role, Lambda Function, or a whole service)
+2. **Quick Scan** — every property analyzed (25 for `AWS::S3::Bucket`) with risk levels, security impact, and recommendations; cached results return instantly with a Refresh bypass
+3. **Severity filters** — narrow the results to Critical / High / Medium / Low
+4. **Generate Guard Rule** — click the button on any property to generate a cfn-guard 3.x rule with pass/fail test templates
+5. **Guard Rules collection** — add rules to a collection tab, download all as a `.guard` ruleset file ready for CI/CD
+6. **Discover a whole service** — paste a service index URL (e.g. `AWS_IAM.html`) to list every resource and batch-analyze up to 5 in parallel
 
 You can also paste a **service index URL** (e.g. `AWS_IAM.html`) to discover every CloudFormation resource in that service, select up to 5, and batch-analyze them in parallel — each result gets the same severity filters and per-property Guard-rule generation. Discovery results are cached (with a Refresh bypass), so repeat discovers of the same service return instantly.
 
