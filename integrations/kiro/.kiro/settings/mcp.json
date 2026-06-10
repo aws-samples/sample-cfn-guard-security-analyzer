@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "aws-documentation": {
+      "command": "uvx",
+      "args": ["awslabs.aws-documentation-mcp-server@latest"],
+      "disabled": false,
+      "autoApprove": [
+        "read_sections",
+        "read_documentation",
+        "search_documentation",
+        "recommend"
+      ]
+    },
+    "aws-iac": {
+      "command": "uvx",
+      "args": ["awslabs.aws-iac-mcp-server@latest"],
+      "disabled": false,
+      "autoApprove": [
+        "check_cloudformation_template_compliance",
+        "validate_cloudformation_template"
+      ]
+    }
+  }
+}
